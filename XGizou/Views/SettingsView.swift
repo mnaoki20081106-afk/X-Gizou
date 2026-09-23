@@ -2,12 +2,34 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject private var store: ProfileStore
+    @AppStorage(RiskReductionPolicy.enabledKey) private var riskReductionMode = true
     @State private var clearing = false
     @State private var message: String?
 
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    Toggle(isOn: $riskReductionMode) {
+                        Label("安全モード", systemImage: "shield.checkered")
+                    }
+                    .onChange(of: riskReductionMode) { _, newValue in
+                        RiskReductionPolicy.setEnabled(newValue)
+                    }
+
+                    NavigationLink {
+                        SafetyCenterView()
+                    } label: {
+                        Label("安全センター", systemImage: "checkmark.shield")
+                    }
+                } header: {
+                    Text("アカウント安全運用")
+                } footer: {
+                    Text(riskReductionMode
+                         ? "ONではシステム標準のWebKit UAとモバイル表示を使い、X以外のトップレベルリンクを外部ブラウザへ分離します。プロフィールごとのWebデータ分離は常に有効です。"
+                         : "OFFは互換性テスト向けです。保存したUAやデバイス表示プリセットが使われ、実際のWebKit挙動と食い違う可能性があります。")
+                }
+
                 Section("ブラウザデータ") {
                     if let profile = store.selectedProfile {
                         Button(role: .destructive) {
@@ -28,17 +50,18 @@ struct SettingsView: View {
                 Section("実装") {
                     LabeledContent("Web engine", value: "WKWebView")
                     LabeledContent("Profile isolation", value: "WKWebsiteDataStore")
+                    LabeledContent("Safety mode", value: riskReductionMode ? "ON" : "OFF")
                     LabeledContent("Minimum iOS", value: "17.0")
                 }
 
                 Section {
-                    Text("各プロファイルはiOS 17以降の識別付きWKWebsiteDataStoreを使い、Cookie・LocalStorage・IndexedDB・キャッシュ等を分離します。UAはWeb互換性テスト用に明示的に切替できます。")
+                    Text("各プロファイルはiOS 17以降の識別付きWKWebsiteDataStoreを使い、Cookie・LocalStorage・IndexedDB・キャッシュ等を分離します。安全モードでは不自然なUA上書きやデスクトップ偽装を使わず、端末上の標準WebKit情報を優先します。")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
 
                 Section {
-                    Text("X-GizouはWebブラウザプロファイルを分離するアプリです。AppleやWebサービスの端末証明、App Attest、Secure Enclave、ハードウェア識別子、アカウント制限を回避する機能は実装していません。")
+                    Text("安全モードはBANを保証して防ぐものではありません。停止済み端末・アカウントを別物として偽装したり、Apple/XのAttestationやアカウント制限を回避する機能は実装していません。")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }

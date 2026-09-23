@@ -14,15 +14,20 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
     @Published private(set) var title: String = ""
     @Published private(set) var currentURL: URL?
 
+    private var currentProfile: BrowserProfile
+    private var policyObserver: NSObjectProtocol?
+
     init(profile: BrowserProfile) {
         profileID = profile.id
+        currentProfile = profile
 
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = WKWebsiteDataStore(forIdentifier: profile.id)
+        configuration.processPool = WKProcessPool()
 
         let preferences = WKWebpagePreferences()
         preferences.allowsContentJavaScript = true
-        preferences.preferredContentMode = profile.devicePreset.prefersDesktopContent ? .desktop : .mobile
+        preferences.preferredContentMode = RiskReductionPolicy.preferredContentMode(for: profile)
         configuration.defaultWebpagePreferences = preferences
 
         webView = WKWebView(frame: .zero, configuration: configuration)
@@ -33,17 +38,37 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
         webView.uiDelegate = self
         webView.allowsBackForwardNavigationGestures = true
         webView.allowsLinkPreview = true
-        webView.isInspectable = true
 
         apply(profile: profile)
         refreshState()
+
+        policyObserver = NotificationCenter.default.addObserver(
+            forName: .riskReductionPolicyChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.apply(profile: self.currentProfile)
+                if self.webView.url != nil {
+                    self.webView.reload()
+                }
+            }
+        }
+    }
+
+    deinit {
+        if let policyObserver {
+            NotificationCenter.default.removeObserver(policyObserver)
+        }
     }
 
     func apply(profile: BrowserProfile) {
-        let ua = profile.effectiveUserAgent
-        webView.customUserAgent = ua.isEmpty ? nil : ua
+        currentProfile = profile
+        webView.customUserAgent = RiskReductionPolicy.effectiveUserAgent(for: profile)
         webView.configuration.defaultWebpagePreferences.preferredContentMode =
-            profile.devicePreset.prefersDesktopContent ? .desktop : .mobile
+            RiskReductionPolicy.preferredContentMode(for: profile)
+        webView.isInspectable = !RiskReductionPolicy.isEnabled
     }
 
     func startIfNeeded() {
@@ -56,6 +81,11 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
     }
 
     func load(_ url: URL) {
+        if RiskReductionPolicy.shouldOpenTopLevelExternally(url) {
+            UIApplication.shared.open(url)
+            return
+        }
+
         var request = URLRequest(url: url)
         request.cachePolicy = .useProtocolCachePolicy
         webView.load(request)
@@ -119,7 +149,11 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
         windowFeatures: WKWindowFeatures
     ) -> WKWebView? {
         if navigationAction.targetFrame == nil, let requestURL = navigationAction.request.url {
-            load(requestURL)
+            if RiskReductionPolicy.shouldOpenTopLevelExternally(requestURL) {
+                UIApplication.shared.open(requestURL)
+            } else {
+                load(requestURL)
+            }
         }
         return nil
     }
@@ -134,7 +168,24 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
             return
         }
 
-        if let scheme = url.scheme?.lowercased(), ["http", "https", "about"].contains(scheme) {
+        guard let scheme = url.scheme?.lowercased() else {
+            decisionHandler(.cancel)
+            return
+        }
+
+        if ["http", "https"].contains(scheme) {
+            let isTopLevel = navigationAction.targetFrame == nil || navigationAction.targetFrame?.isMainFrame == true
+            if isTopLevel && RiskReductionPolicy.shouldOpenTopLevelExternally(url) {
+                UIApplication.shared.open(url)
+                decisionHandler(.cancel)
+                return
+            }
+
+            decisionHandler(.allow)
+            return
+        }
+
+        if scheme == "about" {
             decisionHandler(.allow)
             return
         }
