@@ -1,17 +1,18 @@
 # X-Gizou
 
-X-Gizou is a SwiftUI + WebKit iOS app that provides persistent, isolated browser profiles for web services such as X.
+X-Gizou is a SwiftUI + WebKit iOS app that provides persistent, isolated browser profiles for X.
 
 ## Implemented
 
-- Native SwiftUI UI with Home / Profiles / BAN Check / Settings tabs
+- Native SwiftUI UI with Home / Profiles / BAN Check / Environment / Settings tabs
 - Persistent multi-profile browsing on iOS 17+
 - A separate `WKWebsiteDataStore(forIdentifier:)` for every profile
 - A separate `WKProcessPool` per active profile browser
 - Cookie, LocalStorage, IndexedDB and cache isolation between profiles
-- User-Agent presets for Safari/Chrome on iOS, iPadOS, macOS, Windows and Android
-- Custom User-Agent input for compatibility testing
+- User-Agent presets for Safari/Chrome on iOS, iPadOS, macOS, Windows and Android in DEBUG compatibility mode
+- Custom User-Agent input for compatibility testing in DEBUG builds
 - Device-profile presets and preview values for compatibility testing
+- Browser-environment diagnostics showing what the active WKWebView actually exposes to a web page
 - Safety Mode enabled by default
 - Safety Center showing active risk-reduction controls
 - System WebKit UA and mobile content mode while Safety Mode is enabled
@@ -23,6 +24,12 @@ X-Gizou is a SwiftUI + WebKit iOS app that provides persistent, isolated browser
 - Honest "unknown / not tested" rendering for checks the current upstream backend does not actually perform
 - GitHub Actions unsigned IPA build
 - Xcode project generation with XcodeGen
+
+## Browser profiles
+
+Each X profile has its own persistent WebKit website-data partition. That isolates login cookies, LocalStorage, IndexedDB and cache from the other profiles, so multiple X sessions can coexist without sharing the same browser-data container.
+
+The Environment tab measures the currently selected profile's browser-visible values, including User-Agent, platform, vendor, language, logical CPU count, touch-point count, screen size, pixel ratio, timezone and `navigator.webdriver`. This is a diagnostic view of the real WKWebView environment; it does not forge device hardware identifiers or attestation.
 
 ## Safety Mode
 
@@ -97,9 +104,7 @@ In DEBUG builds, Safety Mode can be disabled for compatibility testing. Release 
 
 ## Important scope
 
-The device-profile screen is a browser compatibility profile, not an OS-level identity replacement. X-Gizou does **not** bypass or forge Apple/Web-service attestation, Secure Enclave state, hardware identifiers, device-bound credentials, or account enforcement.
-
-This distinction is intentional: the project implements the parts that WebKit officially exposes and that can be built reliably as a normal sideloaded iOS app.
+X-Gizou implements browser-layer session isolation and diagnostics that a normal sideloaded iOS app can reliably provide. It does **not** bypass or forge Apple/Web-service attestation, Secure Enclave state, hardware identifiers, device-bound credentials, or account enforcement.
 
 ## Public-project / upstream references
 

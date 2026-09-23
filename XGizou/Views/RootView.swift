@@ -18,6 +18,11 @@ struct RootView: View {
                     Label("BANチェック", systemImage: "magnifyingglass.circle.fill")
                 }
 
+            EnvironmentView()
+                .tabItem {
+                    Label("環境", systemImage: "viewfinder.circle.fill")
+                }
+
             SettingsView()
                 .tabItem {
                     Label("設定", systemImage: "gearshape.fill")
