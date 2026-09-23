@@ -15,13 +15,15 @@ struct EnvironmentView: View {
                         Section("選択中プロフィール") {
                             LabeledContent("名前", value: profile.name)
                             LabeledContent(
+                                "フィンガープリント",
+                                value: profile.effectiveFingerprintOptions.enabled ? "ON" : "OFF"
+                            )
+                            LabeledContent("端末プリセット", value: profile.devicePreset.title)
+                            LabeledContent(
                                 "データ領域",
                                 value: String(profile.id.uuidString.prefix(8)) + "…"
                             )
-                            LabeledContent(
-                                "Webデータ",
-                                value: "プロフィールごとに分離"
-                            )
+                            LabeledContent("Webデータ", value: "プロフィールごとに分離")
                         }
 
                         Section("Webページから見える環境") {
@@ -35,13 +37,19 @@ struct EnvironmentView: View {
                                 EnvironmentRow(title: "User-Agent", value: snapshot.userAgent, monospaced: true)
                                 EnvironmentRow(title: "Platform", value: snapshot.platform)
                                 EnvironmentRow(title: "Vendor", value: snapshot.vendor)
+                                EnvironmentRow(title: "UA-CH Platform", value: snapshot.uaDataPlatform)
                                 EnvironmentRow(title: "言語", value: snapshot.language)
                                 EnvironmentRow(title: "言語一覧", value: snapshot.languages)
                                 EnvironmentRow(title: "CPU論理コア", value: snapshot.hardwareConcurrency)
+                                EnvironmentRow(title: "Device memory", value: snapshot.deviceMemory)
                                 EnvironmentRow(title: "Touch points", value: snapshot.maxTouchPoints)
                                 EnvironmentRow(title: "Screen", value: snapshot.screen)
                                 EnvironmentRow(title: "Pixel ratio", value: snapshot.pixelRatio)
                                 EnvironmentRow(title: "Timezone", value: snapshot.timezone)
+                                EnvironmentRow(title: "Timezone offset", value: snapshot.timezoneOffset)
+                                EnvironmentRow(title: "WebGL vendor", value: snapshot.webGLVendor)
+                                EnvironmentRow(title: "WebGL renderer", value: snapshot.webGLRenderer)
+                                EnvironmentRow(title: "Canvas signature", value: snapshot.canvasSignature, monospaced: true)
                                 EnvironmentRow(title: "WebDriver", value: snapshot.webdriver)
                             } else if let errorMessage {
                                 Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
@@ -62,11 +70,17 @@ struct EnvironmentView: View {
                         }
 
                         Section {
-                            Text("ここで表示するのは、現在のWKWebViewからWebページに実際に見える値です。X-GizouはCookie・LocalStorage・IndexedDBなどのWebデータをプロフィールごとに分離しますが、端末のハードウェアID、Secure Enclave、Apple/XのAttestationを別端末として偽装するものではありません。")
+                            Text("この画面は、選択中プロフィールの設定を同じJavaScript環境に適用したうえで、Webページから観測できる値を読み取ります。Canvas signatureはプロフィールのシードに応じて安定して変化します。")
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         } header: {
-                            Text("この画面について")
+                            Text("診断")
+                        }
+
+                        Section {
+                            Text("変更対象はWKWebViewのブラウザ層です。iOSの実ハードウェアID、Secure Enclave、AppleのAttestationなどOS外部の識別子はこの画面の対象外です。")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
                         }
                     }
                 } else {
