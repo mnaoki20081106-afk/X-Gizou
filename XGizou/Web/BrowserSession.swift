@@ -190,6 +190,20 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
             return
         }
 
+        if RiskReductionPolicy.shouldBlockExternalScheme(scheme) {
+            decisionHandler(.cancel)
+            return
+        }
+
+        if RiskReductionPolicy.isEnabled {
+            if RiskReductionPolicy.isAllowedExternalScheme(scheme),
+               UIApplication.shared.canOpenURL(url) {
+                UIApplication.shared.open(url)
+            }
+            decisionHandler(.cancel)
+            return
+        }
+
         if UIApplication.shared.canOpenURL(url) {
             UIApplication.shared.open(url)
         }

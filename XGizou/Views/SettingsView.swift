@@ -10,12 +10,22 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 Section {
+                    #if DEBUG
                     Toggle(isOn: $riskReductionMode) {
                         Label("安全モード", systemImage: "shield.checkered")
                     }
                     .onChange(of: riskReductionMode) { _, newValue in
                         RiskReductionPolicy.setEnabled(newValue)
                     }
+                    #else
+                    HStack {
+                        Label("安全モード", systemImage: "shield.checkered")
+                        Spacer()
+                        Text("ON")
+                            .font(.subheadline.bold())
+                            .foregroundStyle(.green)
+                    }
+                    #endif
 
                     NavigationLink {
                         SafetyCenterView()
@@ -25,9 +35,13 @@ struct SettingsView: View {
                 } header: {
                     Text("アカウント安全運用")
                 } footer: {
-                    Text(riskReductionMode
-                         ? "ONではシステム標準のWebKit UAとモバイル表示を使い、X以外のトップレベルリンクを外部ブラウザへ分離します。プロフィールごとのWebデータ分離は常に有効です。"
-                         : "OFFは互換性テスト向けです。保存したUAやデバイス表示プリセットが使われ、実際のWebKit挙動と食い違う可能性があります。")
+                    #if DEBUG
+                    Text(RiskReductionPolicy.isEnabled
+                         ? "標準WebKit・分離セッション・外部リンク分離を使用します。"
+                         : "DEBUG互換性テスト用に安全モードが無効です。")
+                    #else
+                    Text("通常版では安全モードを常時ONにしています。設定操作を増やさず、標準WebKit・分離セッション・外部リンク分離を自動適用します。")
+                    #endif
                 }
 
                 Section("ブラウザデータ") {
@@ -50,18 +64,18 @@ struct SettingsView: View {
                 Section("実装") {
                     LabeledContent("Web engine", value: "WKWebView")
                     LabeledContent("Profile isolation", value: "WKWebsiteDataStore")
-                    LabeledContent("Safety mode", value: riskReductionMode ? "ON" : "OFF")
+                    LabeledContent("Safety mode", value: RiskReductionPolicy.isEnabled ? "ON" : "OFF")
                     LabeledContent("Minimum iOS", value: "17.0")
                 }
 
                 Section {
-                    Text("各プロファイルはiOS 17以降の識別付きWKWebsiteDataStoreを使い、Cookie・LocalStorage・IndexedDB・キャッシュ等を分離します。安全モードでは不自然なUA上書きやデスクトップ偽装を使わず、端末上の標準WebKit情報を優先します。")
+                    Text("各プロファイルは固有のWKWebsiteDataStoreと独立したWebKitプロセスプールを使います。通常版ではUA上書きやデスクトップ偽装をX閲覧に適用せず、端末上の標準WebKit情報を優先します。")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
 
                 Section {
-                    Text("安全モードはBANを保証して防ぐものではありません。停止済み端末・アカウントを別物として偽装したり、Apple/XのAttestationやアカウント制限を回避する機能は実装していません。")
+                    Text("BANをゼロに保証する機能ではありません。また、停止済み端末・アカウントを別物として偽装したり、Apple/XのAttestationやアカウント制限を回避する機能は実装していません。")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }

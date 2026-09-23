@@ -2,20 +2,22 @@ import SwiftUI
 
 struct SafetyCenterView: View {
     @EnvironmentObject private var store: ProfileStore
-    @AppStorage(RiskReductionPolicy.enabledKey) private var riskReductionMode = true
+    @AppStorage(RiskReductionPolicy.enabledKey) private var storedSafetyMode = true
 
     var body: some View {
         List {
             Section {
                 HStack(spacing: 12) {
-                    Image(systemName: riskReductionMode ? "shield.checkered" : "exclamationmark.shield")
+                    Image(systemName: effectiveSafetyEnabled ? "shield.checkered" : "exclamationmark.shield")
                         .font(.title2)
-                        .foregroundStyle(riskReductionMode ? .green : .orange)
+                        .foregroundStyle(effectiveSafetyEnabled ? .green : .orange)
 
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(riskReductionMode ? "安全モード ON" : "安全モード OFF")
+                        Text(effectiveSafetyEnabled ? "安全モード ON" : "安全モード OFF")
                             .font(.headline)
-                        Text(riskReductionMode ? "通常のiOS WebKitとして動作" : "互換性テスト用のUA上書きを許可")
+                        Text(RiskReductionPolicy.isReleaseLocked
+                             ? "通常版では常時有効"
+                             : (effectiveSafetyEnabled ? "通常のiOS WebKitとして動作" : "DEBUG互換性テスト中"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -29,19 +31,29 @@ struct SafetyCenterView: View {
                     ok: uniqueProfileIDs
                 )
                 SafetyRow(
+                    title: "プロセス分離",
+                    detail: "各アクティブプロフィールに独立WKProcessPoolを使用",
+                    ok: true
+                )
+                SafetyRow(
                     title: "UA整合性",
-                    detail: riskReductionMode ? "システムWebKitのUAを使用" : "カスタムUAが有効になる可能性あり",
-                    ok: riskReductionMode
+                    detail: effectiveSafetyEnabled ? "システムWebKitのUAを使用" : "DEBUG上書き可能",
+                    ok: effectiveSafetyEnabled
                 )
                 SafetyRow(
                     title: "表示モード",
-                    detail: riskReductionMode ? "iOSのモバイル表示に固定" : "デスクトップ表示へ変更可能",
-                    ok: riskReductionMode
+                    detail: effectiveSafetyEnabled ? "iOSのモバイル表示に固定" : "DEBUG変更可能",
+                    ok: effectiveSafetyEnabled
                 )
                 SafetyRow(
                     title: "外部リンク分離",
-                    detail: riskReductionMode ? "X以外のトップレベル遷移は外部ブラウザで開く" : "WebView内で開く場合あり",
-                    ok: riskReductionMode
+                    detail: effectiveSafetyEnabled ? "X以外のトップレベル遷移は外部ブラウザへ" : "DEBUGではWebView内遷移可能",
+                    ok: effectiveSafetyEnabled
+                )
+                SafetyRow(
+                    title: "Xアプリへの脱出防止",
+                    detail: effectiveSafetyEnabled ? "x:// / twitter:// をブロック" : "DEBUGでは外部起動可能",
+                    ok: effectiveSafetyEnabled
                 )
                 SafetyRow(
                     title: "自動操作",
@@ -59,27 +71,25 @@ struct SafetyCenterView: View {
                 Section("選択中プロフィール") {
                     LabeledContent("名前", value: profile.name)
                     LabeledContent("データ領域", value: String(profile.id.uuidString.prefix(8)) + "…")
-
-                    if riskReductionMode {
-                        Text("このモードでは、保存済みのUA/デバイス互換性プリセットはX閲覧時には使わず、端末上の標準WebKit情報を優先します。")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Text("UAや表示モードの上書きはサイトから見える情報と実際のWebKit挙動が食い違うことがあります。")
-                            .font(.footnote)
-                            .foregroundStyle(.orange)
-                    }
                 }
             }
 
             Section {
-                Text("この機能はアカウント停止を回避したり、停止済み端末・アカウントを別物として偽装するものではありません。BANをゼロに保証する方法はなく、ここでは誤検知につながり得る不自然なブラウザ偽装やプロフィール間のデータ混在を減らします。")
+                Text("安全モードは、プロフィール間のデータ混在や不自然なブラウザ偽装を避けるためのものです。アカウント停止を回避する保証や、停止済み端末・アカウントを別物として偽装する機能ではありません。")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
         }
         .navigationTitle("安全センター")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var effectiveSafetyEnabled: Bool {
+        #if DEBUG
+        return storedSafetyMode
+        #else
+        return true
+        #endif
     }
 
     private var uniqueProfileIDs: Bool {

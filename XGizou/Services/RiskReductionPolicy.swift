@@ -5,16 +5,40 @@ enum RiskReductionPolicy {
     static let enabledKey = "xgizou.riskReductionMode.enabled"
 
     static var isEnabled: Bool {
+        #if DEBUG
         let defaults = UserDefaults.standard
         if defaults.object(forKey: enabledKey) == nil {
             return true
         }
         return defaults.bool(forKey: enabledKey)
+        #else
+        return true
+        #endif
+    }
+
+    static var isReleaseLocked: Bool {
+        #if DEBUG
+        return false
+        #else
+        return true
+        #endif
     }
 
     static func setEnabled(_ enabled: Bool) {
+        #if DEBUG
         UserDefaults.standard.set(enabled, forKey: enabledKey)
+        #else
+        UserDefaults.standard.set(true, forKey: enabledKey)
+        #endif
         NotificationCenter.default.post(name: .riskReductionPolicyChanged, object: nil)
+    }
+
+    static func bootstrap() {
+        if isReleaseLocked {
+            UserDefaults.standard.set(true, forKey: enabledKey)
+        } else if UserDefaults.standard.object(forKey: enabledKey) == nil {
+            UserDefaults.standard.set(true, forKey: enabledKey)
+        }
     }
 
     static func effectiveUserAgent(for profile: BrowserProfile) -> String? {
@@ -43,6 +67,16 @@ enum RiskReductionPolicy {
         }
 
         return !isXHost(host)
+    }
+
+    static func shouldBlockExternalScheme(_ scheme: String) -> Bool {
+        guard isEnabled else { return false }
+        let normalized = scheme.lowercased()
+        return normalized == "x" || normalized == "twitter"
+    }
+
+    static func isAllowedExternalScheme(_ scheme: String) -> Bool {
+        ["mailto", "tel", "sms", "itms-apps"].contains(scheme.lowercased())
     }
 
     static func isXHost(_ host: String) -> Bool {
