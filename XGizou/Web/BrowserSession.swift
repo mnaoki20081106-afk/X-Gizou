@@ -30,6 +30,10 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
         preferences.preferredContentMode = RiskReductionPolicy.preferredContentMode(for: profile)
         configuration.defaultWebpagePreferences = preferences
 
+        if let script = FingerprintSpoofer.userScript(for: profile) {
+            configuration.userContentController.addUserScript(script)
+        }
+
         webView = WKWebView(frame: .zero, configuration: configuration)
 
         super.init()
@@ -68,6 +72,13 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
         webView.customUserAgent = RiskReductionPolicy.effectiveUserAgent(for: profile)
         webView.configuration.defaultWebpagePreferences.preferredContentMode =
             RiskReductionPolicy.preferredContentMode(for: profile)
+
+        let controller = webView.configuration.userContentController
+        controller.removeAllUserScripts()
+        if let script = FingerprintSpoofer.userScript(for: profile) {
+            controller.addUserScript(script)
+        }
+
         webView.isInspectable = !RiskReductionPolicy.isEnabled
     }
 
