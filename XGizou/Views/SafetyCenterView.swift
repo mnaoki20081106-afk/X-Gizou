@@ -17,7 +17,7 @@ struct SafetyCenterView: View {
                             .font(.headline)
                         Text(RiskReductionPolicy.isReleaseLocked
                              ? "通常版では常時有効"
-                             : (effectiveSafetyEnabled ? "通常のiOS WebKitとして動作" : "DEBUG互換性テスト中"))
+                             : (effectiveSafetyEnabled ? "セッション保護を適用中" : "DEBUG互換性テスト中"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -34,16 +34,6 @@ struct SafetyCenterView: View {
                     title: "プロセス分離",
                     detail: "各アクティブプロフィールに独立WKProcessPoolを使用",
                     ok: true
-                )
-                SafetyRow(
-                    title: "UA整合性",
-                    detail: effectiveSafetyEnabled ? "システムWebKitのUAを使用" : "DEBUG上書き可能",
-                    ok: effectiveSafetyEnabled
-                )
-                SafetyRow(
-                    title: "表示モード",
-                    detail: effectiveSafetyEnabled ? "iOSのモバイル表示に固定" : "DEBUG変更可能",
-                    ok: effectiveSafetyEnabled
                 )
                 SafetyRow(
                     title: "外部リンク分離",
@@ -68,14 +58,21 @@ struct SafetyCenterView: View {
             }
 
             if let profile = store.selectedProfile {
+                let options = profile.effectiveFingerprintOptions
                 Section("選択中プロフィール") {
                     LabeledContent("名前", value: profile.name)
+                    LabeledContent("UA", value: profile.userAgentPreset.title)
+                    LabeledContent("端末", value: profile.devicePreset.title)
+                    LabeledContent("Fingerprint", value: options.enabled ? "ON" : "OFF")
+                    LabeledContent("Canvas", value: options.spoofCanvas ? "ON" : "OFF")
+                    LabeledContent("WebGL", value: options.spoofWebGL ? "ON" : "OFF")
+                    LabeledContent("Timezone", value: options.spoofTimezone ? "ON" : "OFF")
                     LabeledContent("データ領域", value: String(profile.id.uuidString.prefix(8)) + "…")
                 }
             }
 
             Section {
-                Text("安全モードは、プロフィール間のデータ混在や不自然なブラウザ偽装を避けるためのものです。アカウント停止を回避する保証や、停止済み端末・アカウントを別物として偽装する機能ではありません。")
+                Text("安全モードはWebデータ混在や意図しない外部遷移を抑える機能です。UA・ブラウザフィンガープリント設定とは独立しており、プロフィールごとの設定はWebViewへ適用されます。")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
