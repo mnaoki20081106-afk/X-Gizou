@@ -2,28 +2,20 @@ import SwiftUI
 
 struct ProfilesView: View {
     @EnvironmentObject private var store: ProfileStore
-    @AppStorage(RiskReductionPolicy.enabledKey) private var riskReductionMode = true
     @State private var showingNewProfile = false
     @State private var editingProfile: BrowserProfile?
 
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    HStack(spacing: 10) {
-                        Image(systemName: riskReductionMode ? "shield.checkered" : "exclamationmark.shield")
-                            .foregroundStyle(riskReductionMode ? .green : .orange)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(riskReductionMode ? "安全モード ON" : "安全モード OFF")
-                                .font(.subheadline.bold())
-                            Text(riskReductionMode
-                                 ? "各プロフィールを分離し、標準WebKitで動作"
-                                 : "互換性テスト用のUA上書きが有効")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
+                #if DEBUG
+                if !RiskReductionPolicy.isEnabled {
+                    Section {
+                        Label("DEBUG: 安全モードが無効です", systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
                     }
                 }
+                #endif
 
                 Section("プロファイル") {
                     if store.profiles.isEmpty {
@@ -44,9 +36,7 @@ struct ProfilesView: View {
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text(profile.name)
                                             .foregroundStyle(.primary)
-                                        Text(riskReductionMode
-                                             ? "System WebKit • 分離データ領域"
-                                             : "\(profile.userAgentPreset.title) • \(profile.devicePreset.title)")
+                                        Text("分離セッション • iOS WebKit")
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
                                     }
