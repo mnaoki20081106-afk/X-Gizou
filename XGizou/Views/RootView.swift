@@ -13,6 +13,11 @@ struct RootView: View {
                     Label("プロファイル", systemImage: "person.2.fill")
                 }
 
+            ShadowbanCheckView()
+                .tabItem {
+                    Label("BANチェック", systemImage: "magnifyingglass.circle.fill")
+                }
+
             SettingsView()
                 .tabItem {
                     Label("設定", systemImage: "gearshape.fill")
