@@ -70,6 +70,8 @@ struct ProfileEditorView: View {
                         .disabled(!fingerprintEnabled.wrappedValue)
                     Toggle("WebGL", isOn: spoofWebGL)
                         .disabled(!fingerprintEnabled.wrappedValue)
+                    Toggle("Audio", isOn: spoofAudio)
+                        .disabled(!fingerprintEnabled.wrappedValue)
                     Toggle("Timezone", isOn: spoofTimezone)
                         .disabled(!fingerprintEnabled.wrappedValue)
                 } footer: {
@@ -185,6 +187,17 @@ struct ProfileEditorView: View {
             set: { newValue in
                 var options = draft.effectiveFingerprintOptions
                 options.spoofWebGL = newValue
+                draft.fingerprintOptions = options
+            }
+        )
+    }
+
+    private var spoofAudio: Binding<Bool> {
+        Binding(
+            get: { draft.effectiveFingerprintOptions.spoofAudio },
+            set: { newValue in
+                var options = draft.effectiveFingerprintOptions
+                options.spoofAudio = newValue
                 draft.fingerprintOptions = options
             }
         )
