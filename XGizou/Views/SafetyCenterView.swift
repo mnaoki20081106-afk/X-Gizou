@@ -58,7 +58,7 @@ struct SafetyCenterView: View {
             if let profile = store.selectedProfile {
                 Section("選択中プロフィール") {
                     LabeledContent("名前", value: profile.name)
-                    LabeledContent("データ領域", value: profile.id.uuidString.prefix(8) + "…")
+                    LabeledContent("データ領域", value: String(profile.id.uuidString.prefix(8)) + "…")
 
                     if riskReductionMode {
                         Text("このモードでは、保存済みのUA/デバイス互換性プリセットはX閲覧時には使わず、端末上の標準WebKit情報を優先します。")
