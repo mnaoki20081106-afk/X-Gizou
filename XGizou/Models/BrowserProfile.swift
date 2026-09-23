@@ -38,7 +38,7 @@ enum UserAgentPreset: String, CaseIterable, Codable, Identifiable {
         case .safariMac:
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15"
         case .chromeMac:
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7 like Mac OS X) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
         case .chromeWindows:
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
         case .edgeWindows:
@@ -140,6 +140,7 @@ struct FingerprintOptions: Codable, Hashable {
     var enabled: Bool
     var spoofCanvas: Bool
     var spoofWebGL: Bool
+    var spoofAudio: Bool
     var spoofTimezone: Bool
     var language: String
     var languages: [String]
@@ -157,6 +158,7 @@ struct FingerprintOptions: Codable, Hashable {
             enabled: true,
             spoofCanvas: true,
             spoofWebGL: true,
+            spoofAudio: true,
             spoofTimezone: true,
             language: primaryLanguage,
             languages: languages.isEmpty ? [primaryLanguage] : languages,
