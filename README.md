@@ -7,11 +7,15 @@ X-Gizou is a SwiftUI + WebKit iOS app that provides persistent, isolated browser
 - Native SwiftUI UI with Home / Profiles / BAN Check / Settings tabs
 - Persistent multi-profile browsing on iOS 17+
 - A separate `WKWebsiteDataStore(forIdentifier:)` for every profile
+- A separate `WKProcessPool` per active profile browser
 - Cookie, LocalStorage, IndexedDB and cache isolation between profiles
 - User-Agent presets for Safari/Chrome on iOS, iPadOS, macOS, Windows and Android
-- Custom User-Agent input
-- Device-profile presets and preview values
-- Mobile/desktop content-mode selection based on the chosen profile
+- Custom User-Agent input for compatibility testing
+- Device-profile presets and preview values for compatibility testing
+- Safety Mode enabled by default
+- Safety Center showing active risk-reduction controls
+- System WebKit UA and mobile content mode while Safety Mode is enabled
+- External top-level links opened outside the X WebView while Safety Mode is enabled
 - Per-profile and global web-data reset
 - In-app X web browsing with back / forward / reload controls
 - Native shadowban checker UI backed by the public Shadowban-Test/X service
@@ -19,6 +23,24 @@ X-Gizou is a SwiftUI + WebKit iOS app that provides persistent, isolated browser
 - Honest "unknown / not tested" rendering for checks the current upstream backend does not actually perform
 - GitHub Actions unsigned IPA build
 - Xcode project generation with XcodeGen
+
+## Safety Mode
+
+Safety Mode is enabled by default. Its purpose is to reduce accidental account-risk signals caused by inconsistent browser configuration or profile-data mixing.
+
+When enabled:
+
+- each X profile keeps its own persistent WebKit data store
+- each active profile browser uses a separate WebKit process pool
+- custom User-Agent overrides are disabled at runtime
+- WebKit stays in mobile content mode
+- X is allowed to observe the normal browser characteristics of the actual iOS WebKit runtime rather than a contradictory Windows/Android/macOS identity
+- top-level navigation away from X/Twitter opens in the system browser instead of reusing the X profile WebView
+- no automatic posting, following, liking, reposting, or bulk action features are included
+
+The compatibility presets remain in the project for testing, but are ignored at runtime while Safety Mode is on.
+
+Safety Mode does **not** guarantee that an account will never be suspended. It does not disguise a suspended device/account as a new one, bypass X enforcement, forge Apple/X attestation, or replace hardware identifiers. Those are different mechanisms from normal WebKit profile isolation.
 
 ## Shadowban check
 
@@ -67,7 +89,9 @@ configuration.websiteDataStore = WKWebsiteDataStore(forIdentifier: profile.id)
 
 This gives each profile an independent persistent website-data partition while letting the same profile reopen its session after app relaunch.
 
-The selected User-Agent is assigned through `WKWebView.customUserAgent`. Device-profile presets also select WebKit's mobile/desktop content mode.
+A fresh `WKProcessPool` is also assigned to each active profile browser instance.
+
+When Safety Mode is off, the saved User-Agent and device compatibility presets may be applied for testing. When Safety Mode is on, X-Gizou uses the system WebKit UA and mobile content mode.
 
 ## Important scope
 
