@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import UIKit
 import WebKit
@@ -61,11 +62,17 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
     }
 
     func goBack() {
-        if webView.canGoBack { webView.goBack() }
+        if webView.canGoBack {
+            webView.goBack()
+            refreshState()
+        }
     }
 
     func goForward() {
-        if webView.canGoForward { webView.goForward() }
+        if webView.canGoForward {
+            webView.goForward()
+            refreshState()
+        }
     }
 
     func reload() {
@@ -74,6 +81,7 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
         } else {
             webView.reload()
         }
+        refreshState()
     }
 
     private func refreshState() {
