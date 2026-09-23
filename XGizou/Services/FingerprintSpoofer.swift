@@ -23,6 +23,7 @@ private struct FingerprintRuntimeConfiguration: Encodable {
     let spoofTimezone: Bool
     let spoofCanvas: Bool
     let spoofWebGL: Bool
+    let spoofAudio: Bool
     let webGLVendor: String
     let webGLRenderer: String
     let uaDataPlatform: String?
@@ -89,8 +90,10 @@ enum FingerprintSpoofer {
           };
 
           // Navigator surface
-          defineValue(navigator, 'userAgent', cfg.userAgent);
-          defineValue(navigator, 'appVersion', cfg.appVersion);
+          if (cfg.userAgent) {
+            defineValue(navigator, 'userAgent', cfg.userAgent);
+            defineValue(navigator, 'appVersion', cfg.appVersion);
+          }
           defineValue(navigator, 'platform', cfg.platform);
           defineValue(navigator, 'vendor', cfg.vendor);
           defineValue(navigator, 'language', cfg.language);
@@ -202,6 +205,38 @@ enum FingerprintSpoofer {
             };
             patchWebGL(globalThis.WebGLRenderingContext && WebGLRenderingContext.prototype);
             patchWebGL(globalThis.WebGL2RenderingContext && WebGL2RenderingContext.prototype);
+          }
+
+          // Audio surface: stable, tiny per-profile perturbation applied once
+          // to each AudioBuffer channel.
+          if (cfg.spoofAudio && globalThis.AudioBuffer && AudioBuffer.prototype.getChannelData) {
+            const originalGetChannelData = AudioBuffer.prototype.getChannelData;
+            const touchedChannels = new WeakMap();
+            try {
+              Object.defineProperty(AudioBuffer.prototype, 'getChannelData', {
+                value: function(channel) {
+                  const data = originalGetChannelData.call(this, channel);
+                  let touched = touchedChannels.get(this);
+                  if (!touched) {
+                    touched = new Set();
+                    touchedChannels.set(this, touched);
+                  }
+                  if (!touched.has(channel) && data && data.length) {
+                    const edits = Math.min(4, data.length);
+                    for (let i = 0; i < edits; i++) {
+                      const mixed = mix32((Number(channel) * 131 + i * 977 + data.length) >>> 0);
+                      const index = mixed % data.length;
+                      const delta = (mixed & 1) === 0 ? 0.0000001 : -0.0000001;
+                      data[index] = data[index] + delta;
+                    }
+                    touched.add(channel);
+                  }
+                  return data;
+                },
+                writable: true,
+                configurable: true
+              });
+            } catch (_) {}
           }
 
           // Canvas surface: stable per-profile perturbation. It does not mutate
@@ -343,6 +378,7 @@ enum FingerprintSpoofer {
             spoofTimezone: options.spoofTimezone,
             spoofCanvas: options.spoofCanvas,
             spoofWebGL: options.spoofWebGL,
+            spoofAudio: options.spoofAudio,
             webGLVendor: traits.webGLVendor,
             webGLRenderer: traits.webGLRenderer,
             uaDataPlatform: traits.uaDataPlatform,
