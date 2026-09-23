@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import WebKit
 
@@ -26,6 +27,7 @@ final class ProfileStore: ObservableObject {
         } else {
             profiles.append(profile)
         }
+
         if selectedProfileID == nil {
             selectedProfileID = profile.id
         }
@@ -37,11 +39,17 @@ final class ProfileStore: ObservableObject {
     }
 
     func delete(at offsets: IndexSet) {
-        let ids = offsets.map { profiles[$0].id }
+        let ids = offsets.compactMap { index in
+            profiles.indices.contains(index) ? profiles[index].id : nil
+        }
+
         for id in ids {
             Task { await clearWebsiteData(for: id) }
         }
-        profiles.remove(atOffsets: offsets)
+
+        for index in offsets.sorted(by: >) where profiles.indices.contains(index) {
+            profiles.remove(at: index)
+        }
 
         if let selectedProfileID, !profiles.contains(where: { $0.id == selectedProfileID }) {
             self.selectedProfileID = profiles.first?.id
@@ -56,7 +64,7 @@ final class ProfileStore: ObservableObject {
 
     func clearWebsiteData(for profileID: UUID) async {
         let store = WKWebsiteDataStore(forIdentifier: profileID)
-        await withCheckedContinuation { continuation in
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             store.removeData(
                 ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(),
                 modifiedSince: .distantPast
