@@ -26,7 +26,7 @@ enum RiskReductionPolicy {
         return ua.isEmpty ? nil : ua
     }
 
-    static func preferredContentMode(for profile: BrowserProfile) -> WKContentMode {
+    static func preferredContentMode(for profile: BrowserProfile) -> WKWebpagePreferences.ContentMode {
         if isEnabled {
             return .mobile
         }
