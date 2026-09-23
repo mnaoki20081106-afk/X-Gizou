@@ -26,7 +26,7 @@ X-Gizou is a SwiftUI + WebKit iOS app that provides persistent, isolated browser
 
 ## Safety Mode
 
-Safety Mode is enabled by default. Its purpose is to reduce accidental account-risk signals caused by inconsistent browser configuration or profile-data mixing.
+Safety Mode is enabled by default and locked ON in Release builds. Its purpose is to reduce accidental account-risk signals caused by inconsistent browser configuration or profile-data mixing without adding day-to-day UI friction.
 
 When enabled:
 
@@ -36,9 +36,11 @@ When enabled:
 - WebKit stays in mobile content mode
 - X is allowed to observe the normal browser characteristics of the actual iOS WebKit runtime rather than a contradictory Windows/Android/macOS identity
 - top-level navigation away from X/Twitter opens in the system browser instead of reusing the X profile WebView
+- x:// and twitter:// cross-app escapes are blocked inside the protected X session
+- duplicate profile identifiers are repaired on load so two profiles cannot accidentally reuse the same WebKit data-store identity
 - no automatic posting, following, liking, reposting, or bulk action features are included
 
-The compatibility presets remain in the project for testing, but are ignored at runtime while Safety Mode is on.
+The compatibility presets remain available only to DEBUG builds for development/testing. Release IPA builds keep the normal profile UI minimal and do not expose UA/device override controls.
 
 Safety Mode does **not** guarantee that an account will never be suspended. It does not disguise a suspended device/account as a new one, bypass X enforcement, forge Apple/X attestation, or replace hardware identifiers. Those are different mechanisms from normal WebKit profile isolation.
 
@@ -91,7 +93,7 @@ This gives each profile an independent persistent website-data partition while l
 
 A fresh `WKProcessPool` is also assigned to each active profile browser instance.
 
-When Safety Mode is off, the saved User-Agent and device compatibility presets may be applied for testing. When Safety Mode is on, X-Gizou uses the system WebKit UA and mobile content mode.
+In DEBUG builds, Safety Mode can be disabled for compatibility testing. Release IPA builds lock Safety Mode ON and use the system WebKit UA and mobile content mode.
 
 ## Important scope
 
