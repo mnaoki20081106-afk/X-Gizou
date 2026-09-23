@@ -13,6 +13,7 @@ final class ProfileStore: ObservableObject {
     private let selectedProfileKey = "xgizou.selectedProfile.v1"
 
     init() {
+        RiskReductionPolicy.bootstrap()
         load()
     }
 
@@ -83,7 +84,7 @@ final class ProfileStore: ObservableObject {
     private func load() {
         if let data = UserDefaults.standard.data(forKey: profilesKey),
            let decoded = try? JSONDecoder().decode([BrowserProfile].self, from: data) {
-            profiles = decoded
+            profiles = repairedProfiles(decoded)
         }
 
         if let raw = UserDefaults.standard.string(forKey: selectedProfileKey),
@@ -93,6 +94,24 @@ final class ProfileStore: ObservableObject {
         } else {
             selectedProfileID = profiles.first?.id
         }
+
+        persist()
+    }
+
+    private func repairedProfiles(_ input: [BrowserProfile]) -> [BrowserProfile] {
+        var seen = Set<UUID>()
+        var output: [BrowserProfile] = []
+        output.reserveCapacity(input.count)
+
+        for var profile in input {
+            if seen.contains(profile.id) {
+                profile.id = UUID()
+            }
+            seen.insert(profile.id)
+            output.append(profile)
+        }
+
+        return output
     }
 
     private func persist() {
