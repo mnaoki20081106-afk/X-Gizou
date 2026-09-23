@@ -38,7 +38,7 @@ enum UserAgentPreset: String, CaseIterable, Codable, Identifiable {
         case .safariMac:
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15"
         case .chromeMac:
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7 like Mac OS X) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
         case .chromeWindows:
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
         case .edgeWindows:
@@ -117,6 +117,63 @@ enum DevicePreset: String, CaseIterable, Codable, Identifiable {
             false
         }
     }
+
+    var recommendedUserAgent: UserAgentPreset {
+        switch self {
+        case .iPhone16Pro, .iPhone15:
+            .safariIOS
+        case .iPadPro13:
+            .safariIPad
+        case .macBookPro:
+            .safariMac
+        case .windowsPC:
+            .chromeWindows
+        case .pixel8:
+            .chromeAndroid
+        case .custom:
+            .custom
+        }
+    }
+}
+
+struct FingerprintOptions: Codable, Hashable {
+    var enabled: Bool
+    var spoofCanvas: Bool
+    var spoofWebGL: Bool
+    var spoofTimezone: Bool
+    var language: String
+    var languages: [String]
+    var timezoneIdentifier: String
+    var dateTimezoneOffsetMinutes: Int
+    var seed: UInt64
+
+    static func defaults(for profileID: UUID) -> FingerprintOptions {
+        let preferred = Locale.preferredLanguages
+        let primaryLanguage = preferred.first ?? "ja-JP"
+        let languages = Array(preferred.prefix(3))
+        let timezone = TimeZone.current
+
+        return FingerprintOptions(
+            enabled: true,
+            spoofCanvas: true,
+            spoofWebGL: true,
+            spoofTimezone: true,
+            language: primaryLanguage,
+            languages: languages.isEmpty ? [primaryLanguage] : languages,
+            timezoneIdentifier: timezone.identifier,
+            dateTimezoneOffsetMinutes: -(timezone.secondsFromGMT() / 60),
+            seed: stableSeed(for: profileID)
+        )
+    }
+
+    private static func stableSeed(for id: UUID) -> UInt64 {
+        var hash: UInt64 = 1_469_598_103_934_665_603
+        for byte in id.uuidString.utf8 {
+            hash ^= UInt64(byte)
+            hash = hash &* 1_099_511_628_211
+        }
+        return hash
+    }
 }
 
 struct BrowserProfile: Identifiable, Codable, Hashable {
@@ -126,6 +183,7 @@ struct BrowserProfile: Identifiable, Codable, Hashable {
     var customUserAgent: String
     var devicePreset: DevicePreset
     var customDevice: DeviceDescriptor
+    var fingerprintOptions: FingerprintOptions?
     var createdAt: Date
 
     init(
@@ -135,6 +193,7 @@ struct BrowserProfile: Identifiable, Codable, Hashable {
         customUserAgent: String = "",
         devicePreset: DevicePreset = .iPhone15,
         customDevice: DeviceDescriptor = .customDefault,
+        fingerprintOptions: FingerprintOptions? = nil,
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -143,6 +202,7 @@ struct BrowserProfile: Identifiable, Codable, Hashable {
         self.customUserAgent = customUserAgent
         self.devicePreset = devicePreset
         self.customDevice = customDevice
+        self.fingerprintOptions = fingerprintOptions ?? FingerprintOptions.defaults(for: id)
         self.createdAt = createdAt
     }
 
@@ -156,5 +216,9 @@ struct BrowserProfile: Identifiable, Codable, Hashable {
 
     var effectiveDevice: DeviceDescriptor {
         devicePreset == .custom ? customDevice : devicePreset.descriptor
+    }
+
+    var effectiveFingerprintOptions: FingerprintOptions {
+        fingerprintOptions ?? FingerprintOptions.defaults(for: id)
     }
 }
