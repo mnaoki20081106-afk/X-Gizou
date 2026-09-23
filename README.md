@@ -9,10 +9,16 @@ X-Gizou is a SwiftUI + WebKit iOS app that provides persistent, isolated browser
 - A separate `WKWebsiteDataStore(forIdentifier:)` for every profile
 - A separate `WKProcessPool` per active profile browser
 - Cookie, LocalStorage, IndexedDB and cache isolation between profiles
-- User-Agent presets for Safari/Chrome on iOS, iPadOS, macOS, Windows and Android in DEBUG compatibility mode
-- Custom User-Agent input for compatibility testing in DEBUG builds
-- Device-profile presets and preview values for compatibility testing
-- Browser-environment diagnostics showing what the active WKWebView actually exposes to a web page
+- User-Agent presets for Safari/Chrome on iOS, iPadOS, macOS, Windows and Android
+- Custom User-Agent input per profile
+- Browser-visible device fingerprint profiles for iPhone, iPad, macOS, Windows and Android
+- Navigator spoofing: platform, vendor, language, languages, hardwareConcurrency, maxTouchPoints, webdriver and deviceMemory where appropriate
+- Screen spoofing: width, height, available size, color depth and devicePixelRatio
+- WebGL vendor/renderer spoofing
+- Stable per-profile Canvas and Audio fingerprint perturbation
+- Timezone and timezone-offset spoofing
+- Chromium-style userAgentData surface for Windows/Android Chromium presets
+- Browser-environment diagnostics showing the values the configured WKWebView exposes to a web page
 - Safety Mode enabled by default
 - Safety Center showing active risk-reduction controls
 - System WebKit UA and mobile content mode while Safety Mode is enabled
@@ -29,7 +35,11 @@ X-Gizou is a SwiftUI + WebKit iOS app that provides persistent, isolated browser
 
 Each X profile has its own persistent WebKit website-data partition. That isolates login cookies, LocalStorage, IndexedDB and cache from the other profiles, so multiple X sessions can coexist without sharing the same browser-data container.
 
-The Environment tab measures the currently selected profile's browser-visible values, including User-Agent, platform, vendor, language, logical CPU count, touch-point count, screen size, pixel ratio, timezone and `navigator.webdriver`. This is a diagnostic view of the real WKWebView environment; it does not forge device hardware identifiers or attestation.
+Each profile also has a browser fingerprint configuration. X-Gizou injects a `WKUserScript` at document start in the main frame and subframes so that browser-visible values are consistent from the beginning of page execution. The profile controls User-Agent, navigator fields, screen metrics, WebGL, Canvas, Audio and timezone surfaces.
+
+Canvas and Audio use a stable profile-specific seed rather than new random noise on every API call. This keeps the same profile internally consistent while allowing the seed to be regenerated manually.
+
+The Environment tab measures the configured browser-visible values, including User-Agent, platform, vendor, language, CPU count, touch points, device memory, screen size, pixel ratio, timezone, WebGL vendor/renderer and a Canvas signature.
 
 ## Safety Mode
 
@@ -39,15 +49,12 @@ When enabled:
 
 - each X profile keeps its own persistent WebKit data store
 - each active profile browser uses a separate WebKit process pool
-- custom User-Agent overrides are disabled at runtime
-- WebKit stays in mobile content mode
-- X is allowed to observe the normal browser characteristics of the actual iOS WebKit runtime rather than a contradictory Windows/Android/macOS identity
 - top-level navigation away from X/Twitter opens in the system browser instead of reusing the X profile WebView
 - x:// and twitter:// cross-app escapes are blocked inside the protected X session
 - duplicate profile identifiers are repaired on load so two profiles cannot accidentally reuse the same WebKit data-store identity
 - no automatic posting, following, liking, reposting, or bulk action features are included
 
-The compatibility presets remain available only to DEBUG builds for development/testing. Release IPA builds keep the normal profile UI minimal and do not expose UA/device override controls.
+UA and browser-fingerprint profiles are available in normal Release builds. Safety Mode continues to handle profile-data separation and external navigation; it does not disable per-profile fingerprint settings.
 
 Safety Mode does **not** guarantee that an account will never be suspended. It does not disguise a suspended device/account as a new one, bypass X enforcement, forge Apple/X attestation, or replace hardware identifiers. Those are different mechanisms from normal WebKit profile isolation.
 
@@ -100,7 +107,7 @@ This gives each profile an independent persistent website-data partition while l
 
 A fresh `WKProcessPool` is also assigned to each active profile browser instance.
 
-In DEBUG builds, Safety Mode can be disabled for compatibility testing. Release IPA builds lock Safety Mode ON and use the system WebKit UA and mobile content mode.
+In DEBUG builds, Safety Mode can be disabled for compatibility testing. Release IPA builds lock Safety Mode ON for session and navigation protections, while UA and fingerprint values continue to come from the selected profile.
 
 ## Important scope
 
@@ -111,6 +118,7 @@ X-Gizou implements browser-layer session isolation and diagnostics that a normal
 The implementation uses native WebKit directly and keeps runtime dependencies minimal. The design was informed by current public projects and upstream sources, especially:
 
 - WebKit's `WKWebsiteDataStore` named-profile implementation
+- dvm-sh/browser-fingerprint-spoofer (MIT) as a design reference for common browser fingerprint surfaces; X-Gizou implements its own Swift/WKUserScript layer
 - Shadowban-Test/X public shadowban checking service
 - Cybozu WebUI (SwiftUI / WKWebView patterns)
 - Kyle Hickinson's SwiftUI-WebView (observable WKWebView patterns)
