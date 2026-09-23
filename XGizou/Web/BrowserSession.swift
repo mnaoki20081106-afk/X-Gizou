@@ -23,6 +23,7 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
 
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = WKWebsiteDataStore(forIdentifier: profile.id)
+        configuration.processPool = WKProcessPool()
 
         let preferences = WKWebpagePreferences()
         preferences.allowsContentJavaScript = true
