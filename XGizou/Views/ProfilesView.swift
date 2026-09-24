@@ -36,7 +36,7 @@ struct ProfilesView: View {
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text(profile.name)
                                             .foregroundStyle(.primary)
-                                        Text(profile.effectiveExecutionMode == .remote ? "リモート • サーバー側セッション" : "分離セッション • iOS WebKit")
+                                        Text(profile.effectiveExecutionMode == .remote ? "リモート • サーバー側セッション" : "ブラウザデータ分離 • iOS WebKit")
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
                                     }
@@ -87,4 +87,3 @@ struct ProfilesView: View {
         }
     }
 }
-

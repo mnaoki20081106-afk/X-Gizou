@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ProfileEditorView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var store: ProfileStore
 
     private let isNew: Bool
     private let onSave: (BrowserProfile) -> Void
@@ -37,6 +38,11 @@ struct ProfileEditorView: View {
                         if draft.remoteBrowserURL == nil {
                             Text("HTTPSの接続先を入力してください。パスワードやトークンはURLに含めないでください。")
                                 .font(.caption)
+                        }
+                        if remoteServiceIsShared {
+                            Text("別のプロフィールが同じリモートブラウザを使用しています。別コンテナの専用接続先を設定してください。")
+                                .font(.caption)
+                                .foregroundStyle(.red)
                         }
                     } header: {
                         Text("専用ブラウザの接続先")
@@ -205,7 +211,14 @@ struct ProfileEditorView: View {
     }
 
     private var canSave: Bool {
-        draft.effectiveExecutionMode == .remote ? draft.remoteBrowserURL != nil : hasValidTimezone
+        draft.effectiveExecutionMode == .remote
+            ? draft.remoteBrowserService != nil && !remoteServiceIsShared
+            : hasValidTimezone
+    }
+
+    private var remoteServiceIsShared: Bool {
+        guard let service = draft.remoteBrowserService else { return false }
+        return store.profiles.contains { $0.id != draft.id && $0.remoteBrowserService == service }
     }
 
     private var userAgentSelection: Binding<UserAgentPreset> {

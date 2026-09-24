@@ -245,6 +245,16 @@ struct BrowserProfile: Identifiable, Codable, Hashable {
         return url
     }
 
+    /// The remote-control service, not a path within that service, owns the
+    /// actual browser session. Two paths on the same host and port are not
+    /// evidence of separate Chromium instances.
+    var remoteBrowserService: String? {
+        guard effectiveExecutionMode == .remote,
+              let url = remoteBrowserURL,
+              let host = url.host?.lowercased() else { return nil }
+        return "\(host):\(url.port ?? 443)"
+    }
+
     init(
         id: UUID = UUID(),
         name: String = "新しいプロフィール",
@@ -300,4 +310,3 @@ struct BrowserProfile: Identifiable, Codable, Hashable {
         fingerprintOptions ?? FingerprintOptions.defaults(for: id)
     }
 }
-
