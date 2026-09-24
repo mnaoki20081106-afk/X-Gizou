@@ -106,6 +106,12 @@ final class ProfileStore: ObservableObject {
         for var profile in input {
             if seen.contains(profile.id) {
                 profile.id = UUID()
+                var options = profile.effectiveFingerprintOptions
+                options.seed = FingerprintOptions.defaults(for: profile.id).seed
+                profile.fingerprintOptions = options
+            }
+            if profile.fingerprintOptions == nil {
+                profile.fingerprintOptions = FingerprintOptions.defaults(for: profile.id)
             }
             seen.insert(profile.id)
             output.append(profile)
@@ -128,3 +134,4 @@ final class ProfileStore: ObservableObject {
         }
     }
 }
+

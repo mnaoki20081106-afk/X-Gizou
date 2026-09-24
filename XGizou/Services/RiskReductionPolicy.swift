@@ -42,19 +42,12 @@ enum RiskReductionPolicy {
     }
 
     static func effectiveUserAgent(for profile: BrowserProfile) -> String? {
-        if isEnabled {
-            return nil
-        }
-
         let ua = profile.effectiveUserAgent.trimmingCharacters(in: .whitespacesAndNewlines)
         return ua.isEmpty ? nil : ua
     }
 
     static func preferredContentMode(for profile: BrowserProfile) -> WKWebpagePreferences.ContentMode {
-        if isEnabled {
-            return .mobile
-        }
-        return profile.devicePreset.prefersDesktopContent ? .desktop : .mobile
+        profile.devicePreset.prefersDesktopContent ? .desktop : .mobile
     }
 
     static func shouldOpenTopLevelExternally(_ url: URL) -> Bool {

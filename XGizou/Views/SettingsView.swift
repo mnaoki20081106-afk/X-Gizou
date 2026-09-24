@@ -33,14 +33,14 @@ struct SettingsView: View {
                         Label("安全センター", systemImage: "checkmark.shield")
                     }
                 } header: {
-                    Text("アカウント安全運用")
+                    Text("セッション保護")
                 } footer: {
                     #if DEBUG
                     Text(RiskReductionPolicy.isEnabled
-                         ? "標準WebKit・分離セッション・外部リンク分離を使用します。"
+                         ? "プロフィール分離・外部リンク分離を使用します。UAとフィンガープリントは各プロフィール設定を使用します。"
                          : "DEBUG互換性テスト用に安全モードが無効です。")
                     #else
-                    Text("通常版では安全モードを常時ONにしています。設定操作を増やさず、標準WebKit・分離セッション・外部リンク分離を自動適用します。")
+                    Text("通常版ではプロフィール分離と外部リンク分離を常時適用します。UAとフィンガープリントは各プロフィール設定を使用します。")
                     #endif
                 }
 
@@ -64,18 +64,19 @@ struct SettingsView: View {
                 Section("実装") {
                     LabeledContent("Web engine", value: "WKWebView")
                     LabeledContent("Profile isolation", value: "WKWebsiteDataStore")
+                    LabeledContent("Fingerprint layer", value: "WKUserScript")
                     LabeledContent("Safety mode", value: RiskReductionPolicy.isEnabled ? "ON" : "OFF")
                     LabeledContent("Minimum iOS", value: "17.0")
                 }
 
                 Section {
-                    Text("各プロファイルは固有のWKWebsiteDataStoreと独立したWebKitプロセスプールを使います。通常版ではUA上書きやデスクトップ偽装をX閲覧に適用せず、端末上の標準WebKit情報を優先します。")
+                    Text("各プロフィールは固有のWKWebsiteDataStoreと独立したWebKitプロセスプールを使います。UA、navigator、screen、WebGL、Canvas、timezoneなどのブラウザ公開値はプロフィール設定に応じて適用されます。")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
 
                 Section {
-                    Text("BANをゼロに保証する機能ではありません。また、停止済み端末・アカウントを別物として偽装したり、Apple/XのAttestationやアカウント制限を回避する機能は実装していません。")
+                    Text("ブラウザ層の値を変更する機能です。iOSの実ハードウェアID、Secure Enclave、AppleのAttestationなどを変更するものではありません。")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }

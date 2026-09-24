@@ -105,7 +105,6 @@ private struct BrowserScreen: View {
         }
         .onChange(of: profile) { _, newValue in
             session.apply(profile: newValue)
-            session.reload()
         }
     }
 }

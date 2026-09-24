@@ -25,6 +25,9 @@ jobs:
           xcodebuild -version
           swift --version
 
+      - name: Test fingerprint runtime
+        run: node --test Tests/fingerprint-runtime.test.cjs
+
       - name: Install XcodeGen
         run: brew install xcodegen
 
