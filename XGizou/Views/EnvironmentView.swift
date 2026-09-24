@@ -92,7 +92,7 @@ struct EnvironmentView: View {
                 }
             }
             .navigationTitle("環境")
-            .task(id: store.selectedProfileID) {
+            .task(id: store.selectedProfile) {
                 guard let profile = store.selectedProfile else {
                     snapshot = nil
                     errorMessage = nil
@@ -107,10 +107,14 @@ struct EnvironmentView: View {
     private func refresh(profile: BrowserProfile) async {
         isLoading = true
         errorMessage = nil
+        snapshot = nil
 
         do {
-            snapshot = try await BrowserEnvironmentProbe.measure(profile: profile)
+            let measured = try await BrowserEnvironmentProbe.measure(profile: profile)
+            guard !Task.isCancelled, store.selectedProfile == profile else { return }
+            snapshot = measured
         } catch {
+            guard !Task.isCancelled, store.selectedProfile == profile else { return }
             snapshot = nil
             errorMessage = error.localizedDescription
         }
