@@ -49,20 +49,25 @@ struct SettingsView: View {
                         Button(role: .destructive) {
                             clear(profile)
                         } label: {
-                            Label("「\(profile.name)」のCookie・キャッシュを削除", systemImage: "trash")
+                            Label("「\(profile.name)」のiPhone側データを削除", systemImage: "trash")
                         }
                     }
 
                     Button(role: .destructive) {
                         clearAll()
                     } label: {
-                        Label("全プロファイルのWebデータを削除", systemImage: "trash.slash")
+                        Label("全プロファイルのiPhone側データを削除", systemImage: "trash.slash")
                     }
                     .disabled(store.profiles.isEmpty)
                 }
 
+                Section {
+                    Text("リモートブラウザのCookie・履歴はサーバー側に保存されます。ここでの削除やプロフィール削除では消えません。リモートブラウザ内で削除してください。")
+                        .font(.footnote)
+                }
+
                 Section("実装") {
-                    LabeledContent("Web engine", value: "WKWebView")
+                    LabeledContent("Web engine", value: "iOS WebKit / Remote")
                     LabeledContent("Profile isolation", value: "WKWebsiteDataStore")
                     LabeledContent("Fingerprint layer", value: "WKUserScript")
                     LabeledContent("Safety mode", value: RiskReductionPolicy.isEnabled ? "ON" : "OFF")
@@ -105,7 +110,7 @@ struct SettingsView: View {
         Task {
             await store.clearWebsiteData(for: profile.id)
             clearing = false
-            message = "選択したプロファイルのWebデータを削除しました。"
+            message = "選択したプロファイルのiPhone側Webデータを削除しました。"
         }
     }
 
@@ -114,7 +119,8 @@ struct SettingsView: View {
         Task {
             await store.clearAllWebsiteData()
             clearing = false
-            message = "全プロファイルのWebデータを削除しました。"
+            message = "全プロファイルのiPhone側Webデータを削除しました。"
         }
     }
 }
+

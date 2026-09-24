@@ -28,6 +28,11 @@ jobs:
       - name: Test fingerprint runtime
         run: node --test Tests/fingerprint-runtime.test.cjs
 
+      - name: Test profile consistency and migration
+        run: |
+          swiftc XGizou/Models/BrowserProfile.swift XGizou/Services/FingerprintSpoofer.swift Tests/profile-consistency.swift -o /tmp/xgizou-profile-tests
+          /tmp/xgizou-profile-tests
+
       - name: Install XcodeGen
         run: brew install xcodegen
 
@@ -63,3 +68,30 @@ jobs:
           name: xcodebuild-log
           path: xcodebuild.log
           if-no-files-found: ignore
+
+  remote-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: remote
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate and start private remote browser
+        run: |
+          docker compose config --quiet
+          docker compose up -d
+      - name: Check remote control page and browser process
+        run: |
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3000/ -o /tmp/remote-index.html && docker compose exec -T chromium sh -c 'pgrep -x chromium || pgrep -x chrome || pgrep -x chromium-browse' >/dev/null; then
+              test -s /tmp/remote-index.html
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose logs --tail=100
+          exit 1
+      - name: Stop temporary test browser
+        if: always()
+        run: docker compose down -v

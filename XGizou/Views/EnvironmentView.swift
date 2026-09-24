@@ -10,7 +10,14 @@ struct EnvironmentView: View {
     var body: some View {
         NavigationStack {
             Group {
-                if let profile = store.selectedProfile {
+                if let profile = store.selectedProfile, profile.effectiveExecutionMode == .remote {
+                    List {
+                        LabeledContent("実行環境", value: "リモートブラウザ")
+                        LabeledContent("接続先", value: profile.remoteBrowserURL?.host ?? "未設定")
+                        Text("Xを処理するブラウザとIPはサーバー側のものです。iPhone内のUA・指紋設定は適用しません。")
+                        Text("この画面からリモート側の値は計測できません。接続先のブラウザ内で確認してください。")
+                    }
+                } else if let profile = store.selectedProfile {
                     List {
                         Section("選択中プロフィール") {
                             LabeledContent("名前", value: profile.name)
@@ -96,6 +103,12 @@ struct EnvironmentView: View {
                 guard let profile = store.selectedProfile else {
                     snapshot = nil
                     errorMessage = nil
+                    return
+                }
+                guard profile.effectiveExecutionMode == .onDevice else {
+                    snapshot = nil
+                    errorMessage = nil
+                    isLoading = false
                     return
                 }
                 await refresh(profile: profile)
