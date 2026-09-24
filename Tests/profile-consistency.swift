@@ -18,6 +18,10 @@ struct ProfileConsistencyTests {
         precondition(profile.effectiveUserAgent.isEmpty)
         precondition(FingerprintSpoofer.userScript(for: profile) == nil)
         let originalSeed = profile.effectiveFingerprintOptions.seed
+        var enabled = profile.effectiveFingerprintOptions
+        enabled.enabled = true
+        profile.fingerprintOptions = enabled
+        precondition(FingerprintSpoofer.userScript(for: profile) != nil)
         profile.selectUserAgent(.chromeIOS)
         precondition(profile.devicePreset == .iPhone16Pro)
         profile.selectUserAgent(.chromeMac)
@@ -38,10 +42,6 @@ struct ProfileConsistencyTests {
         precondition(safari["uaDataPlatform"] == nil)
         precondition(safari["deviceMemory"] == nil)
         precondition(profile.effectiveFingerprintOptions.seed == originalSeed)
-        var enabled = profile.effectiveFingerprintOptions
-        enabled.enabled = true
-        profile.fingerprintOptions = enabled
-        precondition(FingerprintSpoofer.userScript(for: profile) != nil)
 
         profile.customUserAgent = "Custom test UA"
         profile.selectUserAgent(.custom)
