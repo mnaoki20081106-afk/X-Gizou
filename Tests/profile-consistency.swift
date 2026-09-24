@@ -4,7 +4,7 @@ import Foundation
 struct ProfileConsistencyTests {
     static func configuration(_ profile: BrowserProfile) throws -> [String: Any] {
         let script = FingerprintSpoofer.javascript(for: profile)
-        let json = script.components(separatedBy: "const cfg = ")[1].components(separatedBy: ";")[0]
+        let json = script.components(separatedBy: "const cfg = ")[1].components(separatedBy: ";\n")[0]
         return try JSONSerialization.jsonObject(with: Data(json.utf8)) as! [String: Any]
     }
 
