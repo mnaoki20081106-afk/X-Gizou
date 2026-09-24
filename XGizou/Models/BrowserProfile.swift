@@ -189,11 +189,11 @@ struct FingerprintOptions: Codable, Hashable {
         let timezone = TimeZone.current
 
         return FingerprintOptions(
-            enabled: true,
-            spoofCanvas: true,
-            spoofWebGL: true,
-            spoofAudio: true,
-            spoofTimezone: true,
+            enabled: false,
+            spoofCanvas: false,
+            spoofWebGL: false,
+            spoofAudio: false,
+            spoofTimezone: false,
             language: primaryLanguage,
             languages: languages.isEmpty ? [primaryLanguage] : languages,
             timezoneIdentifier: timezone.identifier,
@@ -258,7 +258,7 @@ struct BrowserProfile: Identifiable, Codable, Hashable {
     init(
         id: UUID = UUID(),
         name: String = "新しいプロフィール",
-        userAgentPreset: UserAgentPreset = .safariIOS,
+        userAgentPreset: UserAgentPreset = .custom,
         customUserAgent: String = "",
         devicePreset: DevicePreset = .iPhone15,
         customDevice: DeviceDescriptor = .customDefault,

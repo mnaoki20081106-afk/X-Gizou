@@ -10,6 +10,13 @@ struct ProfileConsistencyTests {
 
     static func main() throws {
         var profile = BrowserProfile(devicePreset: .iPhone16Pro)
+        precondition(!profile.effectiveFingerprintOptions.enabled)
+        precondition(!profile.effectiveFingerprintOptions.spoofCanvas)
+        precondition(!profile.effectiveFingerprintOptions.spoofWebGL)
+        precondition(!profile.effectiveFingerprintOptions.spoofAudio)
+        precondition(!profile.effectiveFingerprintOptions.spoofTimezone)
+        precondition(profile.effectiveUserAgent.isEmpty)
+        precondition(FingerprintSpoofer.userScript(for: profile) == nil)
         let originalSeed = profile.effectiveFingerprintOptions.seed
         profile.selectUserAgent(.chromeIOS)
         precondition(profile.devicePreset == .iPhone16Pro)
@@ -31,6 +38,10 @@ struct ProfileConsistencyTests {
         precondition(safari["uaDataPlatform"] == nil)
         precondition(safari["deviceMemory"] == nil)
         precondition(profile.effectiveFingerprintOptions.seed == originalSeed)
+        var enabled = profile.effectiveFingerprintOptions
+        enabled.enabled = true
+        profile.fingerprintOptions = enabled
+        precondition(FingerprintSpoofer.userScript(for: profile) != nil)
 
         profile.customUserAgent = "Custom test UA"
         profile.selectUserAgent(.custom)
