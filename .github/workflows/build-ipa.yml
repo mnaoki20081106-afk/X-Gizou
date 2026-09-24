@@ -84,7 +84,7 @@ jobs:
       - name: Check remote control page and browser process
         run: |
           for attempt in $(seq 1 60); do
-            if curl --fail --silent http://127.0.0.1:3000/ -o /tmp/remote-index.html && docker compose top | grep -E 'chromium|chrome' >/dev/null; then
+            if curl --fail --silent http://127.0.0.1:3000/ -o /tmp/remote-index.html && docker compose exec -T chromium sh -c 'pgrep -x chromium || pgrep -x chrome || pgrep -x chromium-browse' >/dev/null; then
               test -s /tmp/remote-index.html
               exit 0
             fi
