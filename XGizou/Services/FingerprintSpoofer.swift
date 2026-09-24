@@ -35,7 +35,8 @@ private struct FingerprintRuntimeConfiguration: Encodable {
 
 enum FingerprintSpoofer {
     static func userScript(for profile: BrowserProfile) -> WKUserScript? {
-        guard profile.effectiveFingerprintOptions.enabled else { return nil }
+        guard profile.effectiveExecutionMode == .onDevice,
+              profile.effectiveFingerprintOptions.enabled else { return nil }
 
         return WKUserScript(
             source: javascript(for: profile),
@@ -110,8 +111,10 @@ enum FingerprintSpoofer {
               const match = cfg.userAgent.match(/(?:Chrome|Edg)\\/(\\d+)/);
               return match ? match[1] : '146';
             })();
+            const browserBrand = cfg.userAgent.includes('Edg/') ? 'Microsoft Edge' : 'Google Chrome';
             const brands = Object.freeze([
               Object.freeze({ brand: 'Chromium', version: chromiumVersion }),
+              Object.freeze({ brand: browserBrand, version: chromiumVersion }),
               Object.freeze({ brand: 'Not_A Brand', version: '99' })
             ]);
             const uaData = {
@@ -124,13 +127,13 @@ enum FingerprintSpoofer {
                   mobile: Boolean(cfg.uaDataMobile),
                   platform: cfg.uaDataPlatform,
                   architecture: cfg.uaDataArchitecture || '',
-                  bitness: cfg.uaDataArchitecture === 'x86' ? '64' : '',
+                  bitness: cfg.uaDataArchitecture ? '64' : '',
                   model: cfg.uaDataModel || '',
                   platformVersion: '',
                   uaFullVersion: chromiumVersion + '.0.0.0',
                   fullVersionList: brands.map(item => ({
                     brand: item.brand,
-                    version: item.brand === 'Chromium' ? chromiumVersion + '.0.0.0' : item.version + '.0.0.0'
+                    version: item.version + '.0.0.0'
                   })),
                   wow64: false
                 };
@@ -361,6 +364,8 @@ enum FingerprintSpoofer {
         let options = profile.effectiveFingerprintOptions
         let (width, height) = parseScreen(device.screen)
         let traits = traits(for: profile.devicePreset)
+        let clientHints = profile.userAgentPreset.usesChromiumClientHints
+        let isMac = profile.devicePreset == .macBookPro
 
         let ua = profile.effectiveUserAgent
         let appVersion: String
@@ -381,7 +386,7 @@ enum FingerprintSpoofer {
             languages: options.languages,
             hardwareConcurrency: max(1, device.cpuCores),
             maxTouchPoints: max(0, device.touchPoints),
-            deviceMemory: traits.deviceMemory,
+            deviceMemory: clientHints ? (traits.deviceMemory ?? 8) : nil,
             screenWidth: width,
             screenHeight: height,
             availWidth: width,
@@ -397,10 +402,10 @@ enum FingerprintSpoofer {
             spoofAudio: options.spoofAudio,
             webGLVendor: traits.webGLVendor,
             webGLRenderer: traits.webGLRenderer,
-            uaDataPlatform: traits.uaDataPlatform,
-            uaDataMobile: traits.uaDataMobile,
-            uaDataArchitecture: traits.uaDataArchitecture,
-            uaDataModel: traits.uaDataModel,
+            uaDataPlatform: clientHints ? (isMac ? "macOS" : traits.uaDataPlatform) : nil,
+            uaDataMobile: clientHints ? (traits.uaDataMobile ?? false) : nil,
+            uaDataArchitecture: clientHints ? (isMac ? "arm" : traits.uaDataArchitecture) : nil,
+            uaDataModel: clientHints ? (traits.uaDataModel ?? "") : nil,
             seed: seed
         )
     }

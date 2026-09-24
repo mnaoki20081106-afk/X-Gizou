@@ -27,6 +27,40 @@ enum UserAgentPreset: String, CaseIterable, Codable, Identifiable {
         }
     }
 
+    var recommendedDevice: DevicePreset? {
+        switch self {
+        case .safariIOS, .chromeIOS: .iPhone15
+        case .safariIPad: .iPadPro13
+        case .safariMac, .chromeMac: .macBookPro
+        case .chromeWindows, .edgeWindows: .windowsPC
+        case .chromeAndroid: .pixel8
+        case .custom: nil
+        }
+    }
+
+    func isCompatible(with device: DevicePreset) -> Bool {
+        guard let recommendedDevice, device != .custom else { return true }
+        if recommendedDevice == .iPhone15 {
+            return device == .iPhone15 || device == .iPhone16Pro
+        }
+        return device == recommendedDevice
+    }
+
+    var usesChromiumClientHints: Bool {
+        switch self {
+        case .chromeMac, .chromeWindows, .edgeWindows, .chromeAndroid: true
+        default: false
+        }
+    }
+
+    var navigatorVendor: String? {
+        switch self {
+        case .chromeMac, .chromeWindows, .edgeWindows, .chromeAndroid: "Google Inc."
+        case .safariIOS, .chromeIOS, .safariIPad, .safariMac: "Apple Computer, Inc."
+        case .custom: nil
+        }
+    }
+
     var userAgent: String {
         switch self {
         case .safariIOS:
@@ -178,6 +212,13 @@ struct FingerprintOptions: Codable, Hashable {
     }
 }
 
+enum BrowserExecutionMode: String, Codable, CaseIterable, Identifiable {
+    case onDevice
+    case remote
+    var id: String { rawValue }
+    var title: String { self == .onDevice ? "iPhone内" : "リモートブラウザ" }
+}
+
 struct BrowserProfile: Identifiable, Codable, Hashable {
     var id: UUID
     var name: String
@@ -187,6 +228,22 @@ struct BrowserProfile: Identifiable, Codable, Hashable {
     var customDevice: DeviceDescriptor
     var fingerprintOptions: FingerprintOptions?
     var createdAt: Date
+    var executionMode: BrowserExecutionMode?
+    var remoteBrowserAddress: String?
+
+    var effectiveExecutionMode: BrowserExecutionMode { executionMode ?? .onDevice }
+
+    var remoteBrowserURL: URL? {
+        guard let raw = remoteBrowserAddress?.trimmingCharacters(in: .whitespacesAndNewlines),
+              let parts = URLComponents(string: raw),
+              parts.scheme?.lowercased() == "https",
+              let host = parts.host, !host.isEmpty,
+              parts.user == nil, parts.password == nil,
+              parts.query == nil, parts.fragment == nil,
+              parts.port == nil || (1...65535).contains(parts.port!),
+              let url = parts.url else { return nil }
+        return url
+    }
 
     init(
         id: UUID = UUID(),
@@ -217,10 +274,30 @@ struct BrowserProfile: Identifiable, Codable, Hashable {
     }
 
     var effectiveDevice: DeviceDescriptor {
-        devicePreset == .custom ? customDevice : devicePreset.descriptor
+        var descriptor = devicePreset == .custom ? customDevice : devicePreset.descriptor
+        if devicePreset != .custom, let vendor = userAgentPreset.navigatorVendor {
+            descriptor.vendor = vendor
+        }
+        return descriptor
+    }
+
+    mutating func selectUserAgent(_ preset: UserAgentPreset) {
+        userAgentPreset = preset
+        if effectiveFingerprintOptions.enabled,
+           !preset.isCompatible(with: devicePreset), let device = preset.recommendedDevice {
+            devicePreset = device
+        }
+    }
+
+    mutating func selectDevice(_ preset: DevicePreset) {
+        devicePreset = preset
+        if !userAgentPreset.isCompatible(with: preset) {
+            userAgentPreset = preset.recommendedUserAgent
+        }
     }
 
     var effectiveFingerprintOptions: FingerprintOptions {
         fingerprintOptions ?? FingerprintOptions.defaults(for: id)
     }
 }
+

@@ -133,3 +133,11 @@ See `THIRD_PARTY.md` for the shadowban-service attribution and current limitatio
 Run `node --test Tests/fingerprint-runtime.test.cjs` to check the injected JavaScript's navigator fields, omitted optional values, timezone/DST handling, WebGL forwarding, stable Canvas/Audio output, and optional feature toggles. The same checks run before the Release IPA build. These isolated JavaScript tests do not replace an iOS device test.
 
 Timezone overrides apply to `Date.getTimezoneOffset` and default `Intl.DateTimeFormat` formatting. Explicit formatter timezones are preserved; legacy Date local getters/string methods are not changed. Browser workers, CSS media queries, viewport dimensions, fonts, network client-hint headers, and the underlying WebKit engine are not emulated. This is a browser-value override, not complete emulation of another operating system or browser.
+
+## Execution modes
+
+Profiles can choose on-device WebKit or a remote browser endpoint. Existing saved profiles default to on-device mode. Remote mode displays a private HTTPS remote-control client, without local UA/fingerprint injection. X runs in the server browser. The included `remote/compose.yaml` uses an actual Linux Chromium session, persistent storage, and a loopback-only listener intended for Tailscale Serve. See [remote setup](remote/README.md).
+
+Remote mode requires a provisioned server; adding a URL does not create one. Local profile isolation does not isolate multiple connections to the same remote session, and local data deletion does not delete server-side cookies. Remote diagnostics are explicitly unavailable in the local Environment tab.
+
+On-device UA/device preset selection now synchronizes compatible preset families while preserving custom input. Browser vendor and Chromium client hints are derived from the selected browser. Canvas/Audio seeds remain stable across edits.

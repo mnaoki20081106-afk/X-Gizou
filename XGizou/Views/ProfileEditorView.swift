@@ -20,8 +20,36 @@ struct ProfileEditorView: View {
                     TextField("例: お試し1", text: $draft.name)
                 }
 
+                Section("実行環境") {
+                    Picker("ブラウザを動かす場所", selection: executionModeSelection) {
+                        ForEach(BrowserExecutionMode.allCases) { mode in
+                            Text(mode.title).tag(mode)
+                        }
+                    }
+                }
+
+                if draft.effectiveExecutionMode == .remote {
+                    Section {
+                        TextField("https://サーバー名.ts.net", text: remoteAddress)
+                            .keyboardType(.URL)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                        if draft.remoteBrowserURL == nil {
+                            Text("HTTPSの接続先を入力してください。パスワードやトークンはURLに含めないでください。")
+                                .font(.caption)
+                        }
+                    } header: {
+                        Text("専用ブラウザの接続先")
+                    } footer: {
+                        Text("サーバーで動くブラウザを遠隔操作します。UA・フォント・IPはサーバー側の環境を使用します。接続先の用意が必要です。")
+                    }
+                    Section {
+                        Text("プロフィールを分離するには、サーバー側でも別のブラウザと保存領域を用意してください。同じ接続先は同じセッションです。")
+                        Text("このアプリのCookie削除はiPhone側のみです。Xのログイン情報はリモートブラウザ側で管理・削除します。")
+                    }
+                } else {
                 Section("ユーザーエージェント") {
-                    Picker("プリセット", selection: $draft.userAgentPreset) {
+                    Picker("プリセット", selection: userAgentSelection) {
                         ForEach(UserAgentPreset.allCases) { preset in
                             Text(preset.title).tag(preset)
                         }
@@ -32,6 +60,10 @@ struct ProfileEditorView: View {
                             .frame(minHeight: 90)
                     }
 
+                    Text("プリセット選択時は、UAと端末の組み合わせを自動で合わせます。カスタム入力は維持されます。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
                     Text(draft.effectiveUserAgent.isEmpty ? "システムUA" : draft.effectiveUserAgent)
                         .font(.caption.monospaced())
                         .foregroundStyle(.secondary)
@@ -41,7 +73,7 @@ struct ProfileEditorView: View {
                 Section {
                     Toggle("フィンガープリント変更", isOn: fingerprintEnabled)
 
-                    Picker("端末プリセット", selection: $draft.devicePreset) {
+                    Picker("端末プリセット", selection: deviceSelection) {
                         ForEach(DevicePreset.allCases) { preset in
                             Text(preset.title).tag(preset)
                         }
@@ -143,6 +175,7 @@ struct ProfileEditorView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
+                }
             }
             .navigationTitle(isNew ? "新規プロファイル" : "プロファイル編集")
             .navigationBarTitleDisplayMode(.inline)
@@ -157,10 +190,30 @@ struct ProfileEditorView: View {
                         onSave(draft)
                         dismiss()
                     }
-                    .disabled(!hasValidTimezone)
+                    .disabled(!canSave)
                 }
             }
         }
+    }
+
+    private var executionModeSelection: Binding<BrowserExecutionMode> {
+        Binding(get: { draft.effectiveExecutionMode }, set: { draft.executionMode = $0 })
+    }
+
+    private var remoteAddress: Binding<String> {
+        Binding(get: { draft.remoteBrowserAddress ?? "" }, set: { draft.remoteBrowserAddress = $0 })
+    }
+
+    private var canSave: Bool {
+        draft.effectiveExecutionMode == .remote ? draft.remoteBrowserURL != nil : hasValidTimezone
+    }
+
+    private var userAgentSelection: Binding<UserAgentPreset> {
+        Binding(get: { draft.userAgentPreset }, set: { draft.selectUserAgent($0) })
+    }
+
+    private var deviceSelection: Binding<DevicePreset> {
+        Binding(get: { draft.devicePreset }, set: { draft.selectDevice($0) })
     }
 
     private var fingerprintEnabled: Binding<Bool> {
@@ -170,6 +223,9 @@ struct ProfileEditorView: View {
                 var options = draft.effectiveFingerprintOptions
                 options.enabled = newValue
                 draft.fingerprintOptions = options
+                if newValue {
+                    draft.selectUserAgent(draft.userAgentPreset)
+                }
             }
         )
     }

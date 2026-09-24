@@ -24,6 +24,12 @@ struct SafetyCenterView: View {
                 }
             }
 
+            if store.selectedProfile?.effectiveExecutionMode == .remote {
+                Section("リモート接続") {
+                    Text("XのCookie・ブラウザ環境はサーバー側で管理されます。プロフィールごとに別のリモートブラウザが必要です。")
+                    Text("接続画面はHTTPSの同一接続先に限定しています。ローカルのUA・指紋設定は使用しません。")
+                }
+            } else {
             Section("現在の保護") {
                 SafetyRow(
                     title: "プロファイル分離",
@@ -57,7 +63,9 @@ struct SafetyCenterView: View {
                 )
             }
 
-            if let profile = store.selectedProfile {
+            }
+
+            if let profile = store.selectedProfile, profile.effectiveExecutionMode == .onDevice {
                 let options = profile.effectiveFingerprintOptions
                 Section("選択中プロフィール") {
                     LabeledContent("名前", value: profile.name)
@@ -114,3 +122,4 @@ private struct SafetyRow: View {
         }
     }
 }
+

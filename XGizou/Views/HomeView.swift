@@ -6,8 +6,13 @@ struct HomeView: View {
     var body: some View {
         Group {
             if let profile = store.selectedProfile {
-                BrowserScreen(profile: profile)
-                    .id(profile.id)
+                if profile.effectiveExecutionMode == .remote {
+                    RemoteBrowserScreen(profile: profile)
+                        .id(profile.id)
+                } else {
+                    BrowserScreen(profile: profile)
+                        .id(profile.id)
+                }
             } else {
                 EmptyProfileView()
             }

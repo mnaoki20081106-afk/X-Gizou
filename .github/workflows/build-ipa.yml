@@ -28,6 +28,11 @@ jobs:
       - name: Test fingerprint runtime
         run: node --test Tests/fingerprint-runtime.test.cjs
 
+      - name: Test profile consistency and migration
+        run: |
+          swiftc XGizou/Models/BrowserProfile.swift XGizou/Services/FingerprintSpoofer.swift Tests/profile-consistency.swift -o /tmp/xgizou-profile-tests
+          /tmp/xgizou-profile-tests
+
       - name: Install XcodeGen
         run: brew install xcodegen
 
