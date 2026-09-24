@@ -35,9 +35,9 @@ X-Gizou is a SwiftUI + WebKit iOS app that provides persistent, isolated browser
 
 Each X profile has its own persistent WebKit website-data partition. That isolates login cookies, LocalStorage, IndexedDB and cache from the other profiles, so multiple X sessions can coexist without sharing the same browser-data container.
 
-Each profile also has a browser fingerprint configuration. X-Gizou injects a `WKUserScript` at document start in the main frame and subframes so that browser-visible values are consistent from the beginning of page execution. The profile controls User-Agent, navigator fields, screen metrics, WebGL, Canvas, Audio and timezone surfaces.
+New on-device profiles use WebKit's actual browser values by default: no custom User-Agent, no fingerprint script and no Canvas/Audio noise. Advanced manual controls are collapsed in the profile editor. Enabling manual changes injects a `WKUserScript` at document start in the main frame and subframes. Existing saved profiles retain their settings unless the user turns manual changes off.
 
-Canvas and Audio use a stable profile-specific seed rather than new random noise on every API call. This keeps the same profile internally consistent while allowing the seed to be regenerated manually.
+Optional Canvas and Audio overrides are off for new profiles. When explicitly enabled, they use a stable profile-specific seed rather than new random noise on every API call.
 
 The Environment tab measures the configured browser-visible values, including User-Agent, platform, vendor, language, CPU count, touch points, device memory, screen size, pixel ratio, timezone, WebGL vendor/renderer and a Canvas signature.
 
@@ -140,4 +140,4 @@ Profiles can choose on-device WebKit or a remote browser endpoint. Existing save
 
 Remote mode requires a provisioned server; adding a URL does not create one. Local profile isolation does not isolate multiple connections to the same remote session, and local data deletion does not delete server-side cookies. Remote diagnostics are explicitly unavailable in the local Environment tab.
 
-On-device UA/device preset selection now synchronizes compatible preset families while preserving custom input. Browser vendor and Chromium client hints are derived from the selected browser. Canvas/Audio seeds remain stable across edits.
+On-device UA/device preset selection synchronizes compatible preset families while preserving custom input. Browser vendor and Chromium client hints are derived from the selected browser only in manual mode. Canvas/Audio seeds remain stable across edits. Remote profiles use the server browser's actual environment.

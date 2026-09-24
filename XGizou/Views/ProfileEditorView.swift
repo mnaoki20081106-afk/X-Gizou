@@ -7,25 +7,23 @@ struct ProfileEditorView: View {
     private let isNew: Bool
     private let onSave: (BrowserProfile) -> Void
     @State private var draft: BrowserProfile
+    @State private var showsAdvanced = false
+    @State private var showsIndividualSettings = false
 
     init(profile: BrowserProfile?, onSave: @escaping (BrowserProfile) -> Void) {
         isNew = profile == nil
         self.onSave = onSave
-        _draft = State(initialValue: profile ?? BrowserProfile(name: "お試し1"))
+        _draft = State(initialValue: profile ?? BrowserProfile(name: "新しいプロフィール"))
     }
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("プロフィール名") {
-                    TextField("例: お試し1", text: $draft.name)
-                }
-
-                Section("実行環境") {
-                    Picker("ブラウザを動かす場所", selection: executionModeSelection) {
-                        ForEach(BrowserExecutionMode.allCases) { mode in
-                            Text(mode.title).tag(mode)
-                        }
+                Section("プロフィール") {
+                    TextField("名前", text: $draft.name)
+                    Picker("ブラウザ", selection: executionModeSelection) {
+                        Text("iPhone内").tag(BrowserExecutionMode.onDevice)
+                        Text("リモート").tag(BrowserExecutionMode.remote)
                     }
                 }
 
@@ -35,155 +33,87 @@ struct ProfileEditorView: View {
                             .keyboardType(.URL)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
-                        if draft.remoteBrowserURL == nil {
-                            Text("HTTPSの接続先を入力してください。パスワードやトークンはURLに含めないでください。")
-                                .font(.caption)
-                        }
                         if remoteServiceIsShared {
-                            Text("別のプロフィールが同じリモートブラウザを使用しています。別コンテナの専用接続先を設定してください。")
-                                .font(.caption)
+                            Text("この接続先は別のプロフィールが使用中です。専用ブラウザの接続先を指定してください。")
                                 .foregroundStyle(.red)
                         }
                     } header: {
-                        Text("専用ブラウザの接続先")
+                        Text("接続先")
                     } footer: {
-                        Text("サーバーで動くブラウザを遠隔操作します。UA・フォント・IPはサーバー側の環境を使用します。接続先の用意が必要です。")
-                    }
-                    Section {
-                        Text("プロフィールを分離するには、サーバー側でも別のブラウザと保存領域を用意してください。同じ接続先は同じセッションです。")
-                        Text("このアプリのCookie削除はiPhone側のみです。Xのログイン情報はリモートブラウザ側で管理・削除します。")
+                        Text("専用のブラウザと保存領域をサーバー側に用意してください。UAや描画情報はリモートブラウザの実際の値を使います。")
                     }
                 } else {
-                Section("ユーザーエージェント") {
-                    Picker("プリセット", selection: userAgentSelection) {
-                        ForEach(UserAgentPreset.allCases) { preset in
-                            Text(preset.title).tag(preset)
+                    Section {
+                        LabeledContent("ブラウザ設定", value: draft.effectiveFingerprintOptions.enabled ? "手動" : "自動")
+                        DisclosureGroup("詳細設定", isExpanded: $showsAdvanced) {
+                            Toggle("ブラウザ値を手動で変更", isOn: fingerprintEnabled)
+
+                            if draft.effectiveFingerprintOptions.enabled {
+                                Picker("ブラウザ", selection: userAgentSelection) {
+                                    ForEach(UserAgentPreset.allCases) { preset in
+                                        Text(preset.title).tag(preset)
+                                    }
+                                }
+                                if draft.userAgentPreset == .custom {
+                                    TextField("カスタムUA", text: $draft.customUserAgent, axis: .vertical)
+                                        .lineLimit(2...4)
+                                }
+                                Picker("端末", selection: deviceSelection) {
+                                    ForEach(DevicePreset.allCases) { preset in
+                                        Text(preset.title).tag(preset)
+                                    }
+                                }
+                                if draft.devicePreset == .custom {
+                                    TextField("Platform", text: $draft.customDevice.platform)
+                                    TextField("画面サイズ", text: $draft.customDevice.screen)
+                                    TextField("CPUコア数", value: $draft.customDevice.cpuCores, format: .number)
+                                        .keyboardType(.numberPad)
+                                    TextField("タッチポイント", value: $draft.customDevice.touchPoints, format: .number)
+                                        .keyboardType(.numberPad)
+                                    TextField("Vendor", text: $draft.customDevice.vendor)
+                                }
+
+                                DisclosureGroup("個別調整", isExpanded: $showsIndividualSettings) {
+                                    Toggle("Canvas", isOn: spoofCanvas)
+                                    Toggle("WebGL", isOn: spoofWebGL)
+                                    Toggle("Audio", isOn: spoofAudio)
+                                    Toggle("タイムゾーン", isOn: spoofTimezone)
+                                    if draft.effectiveFingerprintOptions.spoofTimezone {
+                                        TextField("Timezone", text: fingerprintTimezone)
+                                            .textInputAutocapitalization(.never)
+                                            .autocorrectionDisabled()
+                                        if !hasValidTimezone {
+                                            Text("有効なタイムゾーンを入力してください（例: Asia/Tokyo）。")
+                                                .foregroundStyle(.red)
+                                        }
+                                    }
+                                    TextField("Language", text: fingerprintLanguage)
+                                        .textInputAutocapitalization(.never)
+                                        .autocorrectionDisabled()
+                                    Button("言語・時刻をiPhoneの設定に合わせる") {
+                                        var options = draft.effectiveFingerprintOptions
+                                        let preferred = Locale.preferredLanguages
+                                        options.language = preferred.first ?? "ja-JP"
+                                        options.languages = Array(preferred.prefix(3))
+                                        if options.languages.isEmpty { options.languages = [options.language] }
+                                        options.timezoneIdentifier = TimeZone.current.identifier
+                                        options.dateTimezoneOffsetMinutes = -(TimeZone.current.secondsFromGMT() / 60)
+                                        draft.fingerprintOptions = options
+                                    }
+                                    Button("描画シードを再生成") {
+                                        var options = draft.effectiveFingerprintOptions
+                                        options.seed = UInt64.random(in: UInt64.min...UInt64.max)
+                                        draft.fingerprintOptions = options
+                                    }
+                                }
+                            }
                         }
+                    } footer: {
+                        Text("自動ではiPhoneのWebKitが公開する値を使います。手動変更はWebページから見える一部の値だけに適用されます。")
                     }
-
-                    if draft.userAgentPreset == .custom {
-                        TextEditor(text: $draft.customUserAgent)
-                            .frame(minHeight: 90)
-                    }
-
-                    Text("プリセット選択時は、UAと端末の組み合わせを自動で合わせます。カスタム入力は維持されます。")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    Text(draft.effectiveUserAgent.isEmpty ? "システムUA" : draft.effectiveUserAgent)
-                        .font(.caption.monospaced())
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                }
-
-                Section {
-                    Toggle("フィンガープリント変更", isOn: fingerprintEnabled)
-
-                    Picker("端末プリセット", selection: deviceSelection) {
-                        ForEach(DevicePreset.allCases) { preset in
-                            Text(preset.title).tag(preset)
-                        }
-                    }
-                    .disabled(!fingerprintEnabled.wrappedValue)
-
-                    if draft.devicePreset != .custom {
-                        Button("UAも「\(draft.devicePreset.title)」に合わせる") {
-                            draft.userAgentPreset = draft.devicePreset.recommendedUserAgent
-                            draft.customUserAgent = ""
-                        }
-                        .disabled(!fingerprintEnabled.wrappedValue)
-                    }
-
-                    if draft.devicePreset == .custom {
-                        TextField("Platform", text: $draft.customDevice.platform)
-                        TextField("画面サイズ", text: $draft.customDevice.screen)
-                        TextField("CPU コア数", value: $draft.customDevice.cpuCores, format: .number)
-                            .keyboardType(.numberPad)
-                        TextField("タッチポイント", value: $draft.customDevice.touchPoints, format: .number)
-                            .keyboardType(.numberPad)
-                        TextField("Vendor", text: $draft.customDevice.vendor)
-                    }
-
-                    Toggle("Canvas", isOn: spoofCanvas)
-                        .disabled(!fingerprintEnabled.wrappedValue)
-                    Toggle("WebGL", isOn: spoofWebGL)
-                        .disabled(!fingerprintEnabled.wrappedValue)
-                    Toggle("Audio", isOn: spoofAudio)
-                        .disabled(!fingerprintEnabled.wrappedValue)
-                    Toggle("Timezone", isOn: spoofTimezone)
-                        .disabled(!fingerprintEnabled.wrappedValue)
-                } header: {
-                    Text("フィンガープリント")
-                } footer: {
-                    Text("端末プリセットは navigator / screen / hardwareConcurrency / maxTouchPoints / devicePixelRatio / WebGL など、Webページから見えるブラウザ値に適用されます。")
-                }
-
-                Section("地域・言語") {
-                    TextField("Language", text: fingerprintLanguage)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                    TextField("Timezone", text: fingerprintTimezone)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                    if !hasValidTimezone {
-                        Text("有効なタイムゾーンを入力してください（例: Asia/Tokyo）。")
-                            .foregroundStyle(.red)
-                    }
-                    Text("時差はタイムゾーンと対象日時から自動計算します（夏時間対応）。")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    Button("現在のiPhone設定に戻す") {
-                        var options = draft.effectiveFingerprintOptions
-                        let preferred = Locale.preferredLanguages
-                        options.language = preferred.first ?? "ja-JP"
-                        options.languages = Array(preferred.prefix(3))
-                        if options.languages.isEmpty {
-                            options.languages = [options.language]
-                        }
-                        options.timezoneIdentifier = TimeZone.current.identifier
-                        options.dateTimezoneOffsetMinutes = -(TimeZone.current.secondsFromGMT() / 60)
-                        draft.fingerprintOptions = options
-                    }
-                }
-                .disabled(!fingerprintEnabled.wrappedValue)
-
-                Section("フィンガープリントシード") {
-                    LabeledContent(
-                        "Seed",
-                        value: String(draft.effectiveFingerprintOptions.seed, radix: 16).uppercased()
-                    )
-                    .font(.caption.monospaced())
-
-                    Button("Canvas・Audioシードを再生成") {
-                        var options = draft.effectiveFingerprintOptions
-                        options.seed = UInt64.random(in: UInt64.min...UInt64.max)
-                        draft.fingerprintOptions = options
-                    }
-                    .disabled(!fingerprintEnabled.wrappedValue)
-                }
-
-                Section("ブラウザ環境") {
-                    LabeledContent("Runtime", value: "iOS WebKit")
-                    LabeledContent("Session", value: "分離")
-                    LabeledContent(
-                        "Content",
-                        value: draft.devicePreset.prefersDesktopContent ? "Desktop" : "Mobile"
-                    )
-                    LabeledContent(
-                        "Fingerprint",
-                        value: fingerprintEnabled.wrappedValue ? "ON" : "OFF"
-                    )
-                }
-
-                Section {
-                    Text("変更対象はWKWebViewからWebページに公開されるブラウザ値です。iOSの実ハードウェアID、Secure Enclave、AppleのAttestationそのものを書き換える機能ではありません。")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
                 }
             }
-            .navigationTitle(isNew ? "新規プロファイル" : "プロファイル編集")
+            .navigationTitle(isNew ? "新規プロフィール" : "プロフィール編集")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -236,8 +166,8 @@ struct ProfileEditorView: View {
                 var options = draft.effectiveFingerprintOptions
                 options.enabled = newValue
                 draft.fingerprintOptions = options
-                if newValue {
-                    draft.selectUserAgent(draft.userAgentPreset)
+                if newValue && draft.userAgentPreset == .custom && draft.customUserAgent.isEmpty {
+                    draft.selectUserAgent(.safariIOS)
                 }
             }
         )

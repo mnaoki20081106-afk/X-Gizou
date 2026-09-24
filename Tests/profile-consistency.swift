@@ -10,7 +10,18 @@ struct ProfileConsistencyTests {
 
     static func main() throws {
         var profile = BrowserProfile(devicePreset: .iPhone16Pro)
+        precondition(!profile.effectiveFingerprintOptions.enabled)
+        precondition(!profile.effectiveFingerprintOptions.spoofCanvas)
+        precondition(!profile.effectiveFingerprintOptions.spoofWebGL)
+        precondition(!profile.effectiveFingerprintOptions.spoofAudio)
+        precondition(!profile.effectiveFingerprintOptions.spoofTimezone)
+        precondition(profile.effectiveUserAgent.isEmpty)
+        precondition(FingerprintSpoofer.userScript(for: profile) == nil)
         let originalSeed = profile.effectiveFingerprintOptions.seed
+        var enabled = profile.effectiveFingerprintOptions
+        enabled.enabled = true
+        profile.fingerprintOptions = enabled
+        precondition(FingerprintSpoofer.userScript(for: profile) != nil)
         profile.selectUserAgent(.chromeIOS)
         precondition(profile.devicePreset == .iPhone16Pro)
         profile.selectUserAgent(.chromeMac)

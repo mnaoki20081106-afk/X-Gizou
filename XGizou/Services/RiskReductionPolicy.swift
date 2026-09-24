@@ -42,12 +42,13 @@ enum RiskReductionPolicy {
     }
 
     static func effectiveUserAgent(for profile: BrowserProfile) -> String? {
+        guard profile.effectiveFingerprintOptions.enabled else { return nil }
         let ua = profile.effectiveUserAgent.trimmingCharacters(in: .whitespacesAndNewlines)
         return ua.isEmpty ? nil : ua
     }
 
     static func preferredContentMode(for profile: BrowserProfile) -> WKWebpagePreferences.ContentMode {
-        profile.devicePreset.prefersDesktopContent ? .desktop : .mobile
+        profile.effectiveFingerprintOptions.enabled && profile.devicePreset.prefersDesktopContent ? .desktop : .mobile
     }
 
     static func shouldOpenTopLevelExternally(_ url: URL) -> Bool {

@@ -23,9 +23,11 @@ struct EnvironmentView: View {
                             LabeledContent("名前", value: profile.name)
                             LabeledContent(
                                 "フィンガープリント",
-                                value: profile.effectiveFingerprintOptions.enabled ? "ON" : "OFF"
+                                value: profile.effectiveFingerprintOptions.enabled ? "手動変更" : "自動（WebKitの実値）"
                             )
-                            LabeledContent("端末プリセット", value: profile.devicePreset.title)
+                            if profile.effectiveFingerprintOptions.enabled {
+                                LabeledContent("端末プリセット", value: profile.devicePreset.title)
+                            }
                             LabeledContent(
                                 "データ領域",
                                 value: String(profile.id.uuidString.prefix(8)) + "…"
@@ -77,7 +79,7 @@ struct EnvironmentView: View {
                         }
 
                         Section {
-                            Text("この画面は、選択中プロフィールの設定を同じJavaScript環境に適用したうえで、Webページから観測できる値を読み取ります。Canvas signatureはプロフィールのシードに応じて安定して変化します。")
+                            Text("Webページから観測できる値を読み取ります。自動設定ではWebKitの実値を表示し、手動変更を有効にした場合のみブラウザ値を上書きします。")
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         } header: {
