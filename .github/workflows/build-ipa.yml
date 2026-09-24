@@ -92,6 +92,25 @@ jobs:
           done
           docker compose logs --tail=100
           exit 1
+      - name: Verify profile containers have separate browsers and storage
+        run: |
+          XGIZOU_HTTP_PORT=3002 docker compose -p xgizou-profile-two up -d
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3002/ -o /tmp/remote-second.html &&
+               XGIZOU_HTTP_PORT=3002 docker compose -p xgizou-profile-two exec -T chromium pgrep -x chromium >/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+          test -s /tmp/remote-second.html
+          first_id=$(docker compose ps -q chromium)
+          second_id=$(XGIZOU_HTTP_PORT=3002 docker compose -p xgizou-profile-two ps -q chromium)
+          test -n "$first_id" && test -n "$second_id" && test "$first_id" != "$second_id"
+          first_volume=$(docker inspect "$first_id" --format '{{range .Mounts}}{{if eq .Destination "/config"}}{{.Name}}{{end}}{{end}}')
+          second_volume=$(docker inspect "$second_id" --format '{{range .Mounts}}{{if eq .Destination "/config"}}{{.Name}}{{end}}{{end}}')
+          test -n "$first_volume" && test -n "$second_volume" && test "$first_volume" != "$second_volume"
       - name: Stop temporary test browser
         if: always()
-        run: docker compose down -v
+        run: |
+          XGIZOU_HTTP_PORT=3002 docker compose -p xgizou-profile-two down -v
+          docker compose down -v

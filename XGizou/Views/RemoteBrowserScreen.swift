@@ -2,6 +2,7 @@ import SwiftUI
 import WebKit
 
 struct RemoteBrowserScreen: View {
+    @EnvironmentObject private var store: ProfileStore
     let profile: BrowserProfile
     @State private var reloadID = UUID()
     @State private var errorMessage: String?
@@ -28,7 +29,11 @@ struct RemoteBrowserScreen: View {
                 Text(errorMessage)
                     .font(.callout).foregroundStyle(.orange).padding()
             }
-            if let url = profile.remoteBrowserURL {
+            if let service = profile.remoteBrowserService,
+               store.profiles.contains(where: { $0.id != profile.id && $0.remoteBrowserService == service }) {
+                ContentUnavailableView("接続先が共有されています", systemImage: "person.2.slash",
+                    description: Text("同じリモートブラウザを複数プロフィールで使っています。各プロフィールに別コンテナと別の接続先を設定してください。"))
+            } else if let url = profile.remoteBrowserURL {
                 RemoteBrowserCanvas(profileID: profile.id, endpoint: url, errorMessage: $errorMessage)
                     .id(reloadID.uuidString + url.absoluteString)
             } else {
