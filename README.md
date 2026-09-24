@@ -21,7 +21,7 @@ X-Gizou is a SwiftUI + WebKit iOS app that provides persistent, isolated browser
 - Browser-environment diagnostics showing the values the configured WKWebView exposes to a web page
 - Safety Mode enabled by default
 - Safety Center showing active risk-reduction controls
-- System WebKit UA and mobile content mode while Safety Mode is enabled
+- Per-profile UA and content mode in Release builds
 - External top-level links opened outside the X WebView while Safety Mode is enabled
 - Per-profile and global web-data reset
 - In-app X web browsing with back / forward / reload controls
@@ -126,3 +126,10 @@ The implementation uses native WebKit directly and keeps runtime dependencies mi
 - GitHub Actions for repeatable unsigned IPA packaging
 
 See `THIRD_PARTY.md` for the shadowban-service attribution and current limitations.
+
+
+## Runtime verification and limits
+
+Run `node --test Tests/fingerprint-runtime.test.cjs` to check the injected JavaScript's navigator fields, omitted optional values, timezone/DST handling, WebGL forwarding, stable Canvas/Audio output, and optional feature toggles. The same checks run before the Release IPA build. These isolated JavaScript tests do not replace an iOS device test.
+
+Timezone overrides apply to `Date.getTimezoneOffset` and default `Intl.DateTimeFormat` formatting. Explicit formatter timezones are preserved; legacy Date local getters/string methods are not changed. Browser workers, CSS media queries, viewport dimensions, fonts, network client-hint headers, and the underlying WebKit engine are not emulated. This is a browser-value override, not complete emulation of another operating system or browser.

@@ -68,6 +68,7 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
     }
 
     func apply(profile: BrowserProfile) {
+        let changed = currentProfile != profile
         currentProfile = profile
         webView.customUserAgent = RiskReductionPolicy.effectiveUserAgent(for: profile)
         webView.configuration.defaultWebpagePreferences.preferredContentMode =
@@ -80,6 +81,9 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
         }
 
         webView.isInspectable = !RiskReductionPolicy.isEnabled
+        if changed && webView.url != nil {
+            webView.reload()
+        }
     }
 
     func startIfNeeded() {

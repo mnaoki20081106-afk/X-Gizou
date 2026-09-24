@@ -101,11 +101,11 @@ enum FingerprintSpoofer {
           defineValue(navigator, 'hardwareConcurrency', cfg.hardwareConcurrency);
           defineValue(navigator, 'maxTouchPoints', cfg.maxTouchPoints);
           defineValue(navigator, 'webdriver', false);
-          if (cfg.deviceMemory !== null) {
+          if (cfg.deviceMemory != null) {
             defineValue(navigator, 'deviceMemory', cfg.deviceMemory);
           }
 
-          if (cfg.uaDataPlatform !== null) {
+          if (cfg.uaDataPlatform != null) {
             const chromiumVersion = (() => {
               const match = cfg.userAgent.match(/(?:Chrome|Edg)\\/(\\d+)/);
               return match ? match[1] : '146';
@@ -164,25 +164,41 @@ enum FingerprintSpoofer {
           // Timezone surface
           if (cfg.spoofTimezone) {
             try {
-              const originalGetTimezoneOffset = Date.prototype.getTimezoneOffset;
+              const OriginalDateTimeFormat = Intl.DateTimeFormat;
+              // Validate the identifier before replacing any APIs.
+              const offsetFormatter = new OriginalDateTimeFormat('en-US', {
+                timeZone: cfg.timezoneIdentifier, year: 'numeric', month: '2-digit',
+                day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
+                hourCycle: 'h23'
+              });
               Object.defineProperty(Date.prototype, 'getTimezoneOffset', {
                 value: function() {
-                  return cfg.dateTimezoneOffsetMinutes;
+                  const timestamp = Date.prototype.getTime.call(this);
+                  if (!Number.isFinite(timestamp)) return NaN;
+                  const parts = {};
+                  for (const part of offsetFormatter.formatToParts(this)) parts[part.type] = part.value;
+                  const local = new Date(0);
+                  local.setUTCFullYear(Number(parts.year), Number(parts.month) - 1, Number(parts.day));
+                  local.setUTCHours(Number(parts.hour), Number(parts.minute), Number(parts.second), 0);
+                  return (Math.floor(timestamp / 1000) * 1000 - local.getTime()) / 60000;
                 },
                 writable: true,
                 configurable: true
               });
-
-              const originalResolvedOptions = Intl.DateTimeFormat.prototype.resolvedOptions;
-              Object.defineProperty(Intl.DateTimeFormat.prototype, 'resolvedOptions', {
-                value: function() {
-                  const options = originalResolvedOptions.call(this);
-                  return Object.assign({}, options, { timeZone: cfg.timezoneIdentifier });
+              const withTimezone = args => {
+                const options = args[1] === undefined ? {} : args[1];
+                if (options === null) return args; // Preserve the native TypeError.
+                if (options.timeZone !== undefined) return args;
+                return [args[0], { ...options, timeZone: cfg.timezoneIdentifier }];
+              };
+              Intl.DateTimeFormat = new Proxy(OriginalDateTimeFormat, {
+                apply(target, receiver, args) {
+                  return Reflect.apply(target, receiver, withTimezone(args));
                 },
-                writable: true,
-                configurable: true
+                construct(target, args, newTarget) {
+                  return Reflect.construct(target, withTimezone(args), newTarget);
+                }
               });
-              void originalGetTimezoneOffset;
             } catch (_) {}
           }
 

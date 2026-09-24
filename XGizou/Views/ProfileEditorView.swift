@@ -38,7 +38,7 @@ struct ProfileEditorView: View {
                         .textSelection(.enabled)
                 }
 
-                Section("フィンガープリント") {
+                Section {
                     Toggle("フィンガープリント変更", isOn: fingerprintEnabled)
 
                     Picker("端末プリセット", selection: $draft.devicePreset) {
@@ -74,6 +74,8 @@ struct ProfileEditorView: View {
                         .disabled(!fingerprintEnabled.wrappedValue)
                     Toggle("Timezone", isOn: spoofTimezone)
                         .disabled(!fingerprintEnabled.wrappedValue)
+                } header: {
+                    Text("フィンガープリント")
                 } footer: {
                     Text("端末プリセットは navigator / screen / hardwareConcurrency / maxTouchPoints / devicePixelRatio / WebGL など、Webページから見えるブラウザ値に適用されます。")
                 }
@@ -85,12 +87,13 @@ struct ProfileEditorView: View {
                     TextField("Timezone", text: fingerprintTimezone)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
-                    TextField(
-                        "Timezone offset (min)",
-                        value: fingerprintTimezoneOffset,
-                        format: .number
-                    )
-                    .keyboardType(.numbersAndPunctuation)
+                    if !hasValidTimezone {
+                        Text("有効なタイムゾーンを入力してください（例: Asia/Tokyo）。")
+                            .foregroundStyle(.red)
+                    }
+                    Text("時差はタイムゾーンと対象日時から自動計算します（夏時間対応）。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
 
                     Button("現在のiPhone設定に戻す") {
                         var options = draft.effectiveFingerprintOptions
@@ -114,7 +117,7 @@ struct ProfileEditorView: View {
                     )
                     .font(.caption.monospaced())
 
-                    Button("Canvasシードを再生成") {
+                    Button("Canvas・Audioシードを再生成") {
                         var options = draft.effectiveFingerprintOptions
                         options.seed = UInt64.random(in: UInt64.min...UInt64.max)
                         draft.fingerprintOptions = options
@@ -154,6 +157,7 @@ struct ProfileEditorView: View {
                         onSave(draft)
                         dismiss()
                     }
+                    .disabled(!hasValidTimezone)
                 }
             }
         }
@@ -237,14 +241,8 @@ struct ProfileEditorView: View {
         )
     }
 
-    private var fingerprintTimezoneOffset: Binding<Int> {
-        Binding(
-            get: { draft.effectiveFingerprintOptions.dateTimezoneOffsetMinutes },
-            set: { newValue in
-                var options = draft.effectiveFingerprintOptions
-                options.dateTimezoneOffsetMinutes = newValue
-                draft.fingerprintOptions = options
-            }
-        )
+    private var hasValidTimezone: Bool {
+        let options = draft.effectiveFingerprintOptions
+        return !options.enabled || !options.spoofTimezone || TimeZone(identifier: options.timezoneIdentifier) != nil
     }
 }
