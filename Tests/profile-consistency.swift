@@ -61,6 +61,9 @@ struct ProfileConsistencyTests {
         precondition(profile.remoteBrowserURL != nil)
         precondition(profile.remoteBrowserService == "browser.example.ts.net:443")
         precondition(profile.remoteEnvironmentHost == "browser.example.ts.net")
+        precondition(profile.normalizedRemoteEnvironmentID == nil)
+        profile.remoteEnvironmentID = "550E8400-E29B-41D4-A716-446655440000"
+        precondition(profile.normalizedRemoteEnvironmentID == "550e8400-e29b-41d4-a716-446655440000")
         var conflicting = profile
         conflicting.id = UUID()
         conflicting.remoteBrowserAddress = "https://BROWSER.example.ts.net/another-path/"
@@ -71,6 +74,8 @@ struct ProfileConsistencyTests {
         precondition(conflicting.remoteEnvironmentHost == profile.remoteEnvironmentHost)
         conflicting.remoteBrowserAddress = "https://browser-two.example.ts.net/"
         precondition(conflicting.remoteEnvironmentHost != profile.remoteEnvironmentHost)
+        conflicting.remoteEnvironmentID = profile.remoteEnvironmentID
+        precondition(conflicting.normalizedRemoteEnvironmentID == profile.normalizedRemoteEnvironmentID)
         precondition(FingerprintSpoofer.userScript(for: profile) == nil)
         for invalid in ["http://server/", "https://user:pass@server/", "https://server/?token=secret", "https://server/#token", "https://"] {
             profile.remoteBrowserAddress = invalid
