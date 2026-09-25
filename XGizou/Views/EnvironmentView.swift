@@ -12,9 +12,9 @@ struct EnvironmentView: View {
             Group {
                 if let profile = store.selectedProfile, profile.effectiveExecutionMode == .remote {
                     List {
-                        LabeledContent("実行環境", value: "リモートブラウザ")
+                        LabeledContent("実行環境", value: "独立ブラウザ環境")
                         LabeledContent("接続先", value: profile.remoteBrowserURL?.host ?? "未設定")
-                        Text("Xを処理するブラウザとIPはサーバー側のものです。iPhone内のUA・指紋設定は適用しません。")
+                        Text("Xを処理するのは専用のリモートブラウザです。iPhone内のUA・指紋設定は適用せず、リモート環境の実際のOS・ブラウザ・保存領域・ネットワークを使います。")
                         Text("この画面からリモート側の値は計測できません。接続先のブラウザ内で確認してください。")
                     }
                 } else if let profile = store.selectedProfile {
