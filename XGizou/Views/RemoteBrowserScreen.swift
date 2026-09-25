@@ -5,10 +5,6 @@ struct RemoteBrowserScreen: View {
     @EnvironmentObject private var store: ProfileStore
 
     let profile: BrowserProfile
-    let openProfiles: () -> Void
-    let openShadowban: () -> Void
-    let openEnvironment: () -> Void
-    let openSettings: () -> Void
 
     @State private var reloadID = UUID()
     @State private var errorMessage: String?
@@ -17,25 +13,31 @@ struct RemoteBrowserScreen: View {
     @State private var verificationMessage: String?
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
-            Color(uiColor: .systemBackground)
-                .ignoresSafeArea()
+        VStack(spacing: 0) {
+            XBrowserHeader(
+                title: profile.name,
+                canGoBack: false,
+                canGoForward: false,
+                isLoading: isVerifyingEnvironment,
+                goBack: {},
+                goForward: {},
+                reload: reconnect
+            )
 
-            remoteContent
+            ZStack {
+                Color(uiColor: .systemBackground)
 
-            if profile.remoteBrowserURL != nil {
-                controlMenu
-                    .padding(.top, 8)
-                    .padding(.trailing, 8)
-            }
+                remoteContent
 
-            if let errorMessage, environmentVerified {
-                connectionErrorCard(errorMessage)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 58)
+                if let errorMessage, environmentVerified {
+                    connectionErrorCard(errorMessage)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 18)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                }
             }
         }
-        .toolbar(.hidden, for: .tabBar)
+        .background(Color(uiColor: .systemBackground))
         .task(id: reloadID) {
             await verifyEnvironment()
         }
@@ -101,42 +103,6 @@ struct RemoteBrowserScreen: View {
         }
     }
 
-    private var controlMenu: some View {
-        Menu {
-            Button {
-                reconnect()
-            } label: {
-                Label("再接続", systemImage: "arrow.clockwise")
-            }
-
-            Divider()
-
-            Button(action: openProfiles) {
-                Label("プロファイル", systemImage: "person.2.fill")
-            }
-
-            Button(action: openShadowban) {
-                Label("BANチェック", systemImage: "magnifyingglass.circle.fill")
-            }
-
-            Button(action: openEnvironment) {
-                Label("環境", systemImage: "viewfinder.circle.fill")
-            }
-
-            Button(action: openSettings) {
-                Label("設定", systemImage: "gearshape.fill")
-            }
-        } label: {
-            Image(systemName: "ellipsis")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(.primary)
-                .frame(width: 36, height: 36)
-                .background(.ultraThinMaterial, in: Circle())
-                .contentShape(Circle())
-        }
-        .accessibilityLabel("X-Gizouメニュー")
-    }
-
     private func connectionErrorCard(_ message: String) -> some View {
         VStack(spacing: 10) {
             Text("接続が途切れました")
@@ -169,8 +135,6 @@ struct RemoteBrowserScreen: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 28)
-            Button("プロファイルを開く", action: openProfiles)
-                .buttonStyle(.borderedProminent)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -225,9 +189,8 @@ struct RemoteBrowserScreen: View {
     }
 }
 
-// The local WKWebView only renders the remote-control client. X itself runs in
-// the dedicated Chromium environment. Browser chrome and X-Gizou navigation are
-// kept out of the primary surface so the remote X view behaves like a focused app.
+// The local WKWebView renders only the remote-control client. X itself runs in
+// the dedicated Chromium application window on the remote environment.
 private struct RemoteBrowserCanvas: UIViewRepresentable {
     let profileID: UUID
     let endpoint: URL
