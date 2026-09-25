@@ -4,7 +4,7 @@ X-Gizou is a SwiftUI + WebKit iOS app that provides persistent, isolated browser
 
 ## Implemented
 
-- Native SwiftUI UI with Home / Profiles / BAN Check / Environment / Settings tabs
+- Native SwiftUI UI with Home / Profiles / Settings as the primary bottom tabs; BAN Check and Environment remain available from Settings
 - Persistent multi-profile browsing on iOS 17+
 - A separate `WKWebsiteDataStore(forIdentifier:)` for every profile
 - A separate `WKProcessPool` per active profile browser
@@ -136,7 +136,7 @@ Timezone overrides apply to `Date.getTimezoneOffset` and default `Intl.DateTimeF
 
 ## Execution modes
 
-Profiles can choose on-device WebKit or an independent remote browser environment. Existing saved profiles default to on-device mode. Remote mode displays a private HTTPS remote-control client, without local UA/fingerprint injection. X runs in the server browser. The included `remote/compose.yaml` uses an actual Linux Chromium session, persistent storage, and a loopback-only listener intended for Tailscale Serve. Chromium launches X in application mode with browser chrome removed and a portrait 393×852 remote display so X uses its responsive mobile layout. The iOS remote screen also hides X-Gizou's normal tab bar and browser-like header while leaving a small native menu for profile/settings access. See [remote setup](remote/README.md).
+Profiles can choose on-device WebKit or an independent remote browser environment. Existing saved profiles default to on-device mode. Remote mode displays a private HTTPS remote-control client, without local UA/fingerprint injection. X runs in the server browser. The included `remote/compose.yaml` uses an actual Linux Chromium session, persistent storage, and a loopback-only listener intended for Tailscale Serve. Chromium always launches X in application mode with browser chrome removed and a portrait 393×852 remote display so X uses its responsive mobile layout. The iOS shell keeps a compact native header with the selected profile name and reload control, plus a persistent three-item bottom bar for Home / Profiles / Settings. BAN Check and Environment are reachable from Settings. See [remote setup](remote/README.md).
 
 For independent remote profiles, X-Gizou now requires a different hostname per profile and rejects reuse of the same host even when the port or path differs. The intended layout is one dedicated VM/host per profile, so browser process, persistent browser storage, OS environment and network egress are not shared by the app profiles. Remote mode still requires provisioned servers; adding a URL does not create one, and local data deletion does not delete server-side cookies. Remote diagnostics are explicitly unavailable in the local Environment tab.
 
