@@ -3,23 +3,12 @@ import SwiftUI
 struct HomeView: View {
     @EnvironmentObject private var store: ProfileStore
 
-    let openProfiles: () -> Void
-    let openShadowban: () -> Void
-    let openEnvironment: () -> Void
-    let openSettings: () -> Void
-
     var body: some View {
         Group {
             if let profile = store.selectedProfile {
                 if profile.effectiveExecutionMode == .remote {
-                    RemoteBrowserScreen(
-                        profile: profile,
-                        openProfiles: openProfiles,
-                        openShadowban: openShadowban,
-                        openEnvironment: openEnvironment,
-                        openSettings: openSettings
-                    )
-                    .id(profile.id)
+                    RemoteBrowserScreen(profile: profile)
+                        .id(profile.id)
                 } else {
                     BrowserScreen(profile: profile)
                         .id(profile.id)
@@ -37,25 +26,28 @@ private struct EmptyProfileView: View {
             Text("ホーム")
                 .font(.largeTitle.bold())
                 .padding(.horizontal, 24)
-                .padding(.top, 24)
+                .padding(.top, 28)
 
             Spacer()
 
             VStack(spacing: 14) {
                 Image(systemName: "person.crop.circle.badge.questionmark")
-                    .font(.system(size: 68))
+                    .font(.system(size: 64))
                     .foregroundStyle(.secondary)
+
                 Text("プロファイル未選択")
                     .font(.title2.bold())
-                Text("プロファイルタブからアカウント用のブラウザプロファイルを追加・選択してください")
+
+                Text("プロファイルタブからアカウントを追加・選択してください")
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)
-                    .padding(.horizontal, 36)
+                    .padding(.horizontal, 42)
             }
             .frame(maxWidth: .infinity)
 
             Spacer()
         }
+        .background(Color(uiColor: .systemBackground))
     }
 }
 
@@ -70,57 +62,75 @@ private struct BrowserScreen: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 18) {
-                Button {
-                    session.goBack()
-                } label: {
-                    Image(systemName: "chevron.left")
-                }
-                .disabled(!session.canGoBack)
-
-                Button {
-                    session.goForward()
-                } label: {
-                    Image(systemName: "chevron.right")
-                }
-                .disabled(!session.canGoForward)
-
-                Spacer()
-
-                VStack(spacing: 2) {
-                    Text(profile.name)
-                        .font(.headline)
-                        .lineLimit(1)
-                    if let host = session.currentURL?.host {
-                        Text(host)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                Spacer()
-
-                Button {
-                    session.reload()
-                } label: {
-                    Image(systemName: session.isLoading ? "xmark" : "arrow.clockwise")
-                }
-            }
-            .font(.title3)
-            .padding(.horizontal, 18)
-            .padding(.vertical, 12)
-            .background(.ultraThinMaterial)
-
-            Divider()
+            XBrowserHeader(
+                title: profile.name,
+                canGoBack: session.canGoBack,
+                canGoForward: session.canGoForward,
+                isLoading: session.isLoading,
+                goBack: session.goBack,
+                goForward: session.goForward,
+                reload: session.reload
+            )
 
             BrowserWebView(webView: session.webView)
         }
+        .background(Color(uiColor: .systemBackground))
         .onAppear {
             session.apply(profile: profile)
             session.startIfNeeded()
         }
         .onChange(of: profile) { _, newValue in
             session.apply(profile: newValue)
+        }
+    }
+}
+
+struct XBrowserHeader: View {
+    let title: String
+    let canGoBack: Bool
+    let canGoForward: Bool
+    let isLoading: Bool
+    let goBack: () -> Void
+    let goForward: () -> Void
+    let reload: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Button(action: goBack) {
+                Image(systemName: "chevron.left")
+                    .frame(width: 42, height: 42)
+            }
+            .disabled(!canGoBack)
+
+            Button(action: goForward) {
+                Image(systemName: "chevron.right")
+                    .frame(width: 42, height: 42)
+            }
+            .disabled(!canGoForward)
+
+            Spacer(minLength: 4)
+
+            Text(title)
+                .font(.headline)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+
+            Spacer(minLength: 4)
+
+            Button(action: reload) {
+                Image(systemName: isLoading ? "xmark" : "arrow.clockwise")
+                    .frame(width: 42, height: 42)
+            }
+
+            Color.clear
+                .frame(width: 42, height: 42)
+        }
+        .font(.title3)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 4)
+        .background(.ultraThinMaterial)
+        .overlay(alignment: .bottom) {
+            Divider()
         }
     }
 }
