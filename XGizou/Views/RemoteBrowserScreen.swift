@@ -6,6 +6,9 @@ struct RemoteBrowserScreen: View {
     let profile: BrowserProfile
     @State private var reloadID = UUID()
     @State private var errorMessage: String?
+    @State private var environmentVerified = false
+    @State private var isVerifyingEnvironment = false
+    @State private var verificationMessage: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -18,6 +21,8 @@ struct RemoteBrowserScreen: View {
                 Spacer()
                 Button {
                     errorMessage = nil
+                    verificationMessage = nil
+                    environmentVerified = false
                     reloadID = UUID()
                 } label: {
                     Image(systemName: "arrow.clockwise")
@@ -34,12 +39,75 @@ struct RemoteBrowserScreen: View {
                 ContentUnavailableView("独立環境になっていません", systemImage: "person.2.slash",
                     description: Text("同じホストを複数プロフィールで使っています。別プロフィールには別VM・別ホストの専用ブラウザを設定してください。"))
             } else if let url = profile.remoteBrowserURL {
-                RemoteBrowserCanvas(profileID: profile.id, endpoint: url, errorMessage: $errorMessage)
-                    .id(reloadID.uuidString + url.absoluteString)
+                if environmentVerified {
+                    RemoteBrowserCanvas(profileID: profile.id, endpoint: url, errorMessage: $errorMessage)
+                        .id(reloadID.uuidString + url.absoluteString)
+                } else if isVerifyingEnvironment {
+                    VStack(spacing: 12) {
+                        ProgressView()
+                        Text("独立環境を確認中")
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if let verificationMessage {
+                    ContentUnavailableView(
+                        "独立環境を確認できません",
+                        systemImage: "exclamationmark.shield.fill",
+                        description: Text(verificationMessage)
+                    )
+                } else {
+                    ProgressView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
             } else {
                 ContentUnavailableView("接続先が必要です", systemImage: "network",
                     description: Text("プロフィール編集で別VM・別ホストの専用ブラウザHTTPS URLを設定してください。"))
             }
+        }
+        .task(id: reloadID) {
+            await verifyEnvironment()
+        }
+    }
+
+    @MainActor
+    private func verifyEnvironment() async {
+        guard let endpoint = profile.remoteBrowserURL else { return }
+
+        if let host = profile.remoteEnvironmentHost,
+           store.profiles.contains(where: { $0.id != profile.id && $0.remoteEnvironmentHost == host }) {
+            return
+        }
+
+        isVerifyingEnvironment = true
+        environmentVerified = false
+        verificationMessage = nil
+        defer { isVerifyingEnvironment = false }
+
+        do {
+            let actualIdentity = try await RemoteEnvironmentVerifier.fetchIdentity(from: endpoint)
+
+            if let expectedIdentity = profile.normalizedRemoteEnvironmentID,
+               expectedIdentity != actualIdentity {
+                verificationMessage = "保存時と異なる環境IDが返されました。接続先またはブラウザ保存領域が入れ替わっています。プロフィール編集で確認してください。"
+                return
+            }
+
+            if store.profiles.contains(where: {
+                $0.id != profile.id && $0.normalizedRemoteEnvironmentID == actualIdentity
+            }) {
+                verificationMessage = "別プロフィールと同じブラウザ実体が返されました。独立環境として起動を停止しました。"
+                return
+            }
+
+            if profile.normalizedRemoteEnvironmentID == nil {
+                var repaired = profile
+                repaired.remoteEnvironmentID = actualIdentity
+                store.save(repaired)
+            }
+
+            environmentVerified = true
+        } catch {
+            verificationMessage = "環境IDを取得できませんでした。サーバー側のX-GizouゲートウェイとTailscale接続を確認してください。\n\(error.localizedDescription)"
         }
     }
 }
