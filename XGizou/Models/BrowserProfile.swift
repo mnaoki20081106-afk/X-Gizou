@@ -216,7 +216,7 @@ enum BrowserExecutionMode: String, Codable, CaseIterable, Identifiable {
     case onDevice
     case remote
     var id: String { rawValue }
-    var title: String { self == .onDevice ? "iPhone内" : "リモートブラウザ" }
+    var title: String { self == .onDevice ? "iPhone内（セッション分離）" : "独立ブラウザ環境" }
 }
 
 struct BrowserProfile: Identifiable, Codable, Hashable {
@@ -253,6 +253,15 @@ struct BrowserProfile: Identifiable, Codable, Hashable {
               let url = remoteBrowserURL,
               let host = url.host?.lowercased() else { return nil }
         return "\(host):\(url.port ?? 443)"
+    }
+
+    /// A stronger isolation key used by the app for "independent environment"
+    /// mode. Reusing the same hostname across profiles is treated as shared
+    /// infrastructure even when different ports or paths are used.
+    var remoteEnvironmentHost: String? {
+        guard effectiveExecutionMode == .remote,
+              let host = remoteBrowserURL?.host?.lowercased() else { return nil }
+        return host
     }
 
     init(
