@@ -2,9 +2,16 @@ import Combine
 import Foundation
 import WebKit
 
+enum ProfileIsolationState: Equatable {
+    case checking
+    case ready(profileCount: Int)
+    case issue(missingStoreCount: Int)
+}
+
 @MainActor
 final class ProfileStore: ObservableObject {
     @Published private(set) var profiles: [BrowserProfile] = []
+    @Published private(set) var isolationState: ProfileIsolationState = .checking
     @Published var selectedProfileID: UUID? {
         didSet { saveSelectedProfileID() }
     }
@@ -15,6 +22,7 @@ final class ProfileStore: ObservableObject {
     init() {
         RiskReductionPolicy.bootstrap()
         load()
+        Task { await refreshIsolationState() }
     }
 
     var selectedProfile: BrowserProfile? {
@@ -32,7 +40,16 @@ final class ProfileStore: ObservableObject {
         if selectedProfileID == nil {
             selectedProfileID = profile.id
         }
+
+        // Pre-provision the persistent WebKit container for on-device profiles.
+        // This keeps every profile tied to one stable, unique data-store identifier
+        // before its first navigation.
+        if profile.effectiveExecutionMode == .onDevice {
+            _ = WKWebsiteDataStore(forIdentifier: profile.id)
+        }
+
         persist()
+        Task { await refreshIsolationState() }
     }
 
     func select(_ profile: BrowserProfile) {
@@ -44,10 +61,6 @@ final class ProfileStore: ObservableObject {
             profiles.indices.contains(index) ? profiles[index].id : nil
         }
 
-        for id in ids {
-            Task { await clearWebsiteData(for: id) }
-        }
-
         for index in offsets.sorted(by: >) where profiles.indices.contains(index) {
             profiles.remove(at: index)
         }
@@ -56,6 +69,17 @@ final class ProfileStore: ObservableObject {
             self.selectedProfileID = profiles.first?.id
         }
         persist()
+
+        // Remove the underlying named WebKit data stores after the model update so
+        // SwiftUI can tear down any WKWebView still using the deleted profile first.
+        for id in ids {
+            Task { [weak self] in
+                await Task.yield()
+                guard let self else { return }
+                await self.removeWebsiteDataStore(for: id)
+                await self.refreshIsolationState()
+            }
+        }
     }
 
     func delete(_ profile: BrowserProfile) {
@@ -76,8 +100,47 @@ final class ProfileStore: ObservableObject {
     }
 
     func clearAllWebsiteData() async {
-        for profile in profiles {
+        for profile in profiles where profile.effectiveExecutionMode == .onDevice {
             await clearWebsiteData(for: profile.id)
+        }
+        await refreshIsolationState()
+    }
+
+    func refreshIsolationState() async {
+        isolationState = .checking
+
+        let expected = Set(
+            profiles
+                .filter { $0.effectiveExecutionMode == .onDevice }
+                .map(\.id)
+        )
+
+        // Ensure every on-device profile owns a persistent named data store.
+        for id in expected {
+            _ = WKWebsiteDataStore(forIdentifier: id)
+        }
+
+        let identifiers = await WKWebsiteDataStore.allDataStoreIdentifiers
+        let actual = Set(identifiers)
+        let missing = expected.subtracting(actual)
+
+        if missing.isEmpty {
+            isolationState = .ready(profileCount: expected.count)
+        } else {
+            isolationState = .issue(missingStoreCount: missing.count)
+        }
+    }
+
+    private func removeWebsiteDataStore(for profileID: UUID) async {
+        let existing = await WKWebsiteDataStore.allDataStoreIdentifiers
+        guard existing.contains(profileID) else { return }
+
+        do {
+            try await WKWebsiteDataStore.remove(forIdentifier: profileID)
+        } catch {
+            // A store can still be in use for a short time while its WKWebView is
+            // being released. Clearing all website data is the safe fallback.
+            await clearWebsiteData(for: profileID)
         }
     }
 
@@ -134,4 +197,3 @@ final class ProfileStore: ObservableObject {
         }
     }
 }
-
