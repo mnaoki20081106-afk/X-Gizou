@@ -29,16 +29,16 @@ struct RemoteBrowserScreen: View {
                 Text(errorMessage)
                     .font(.callout).foregroundStyle(.orange).padding()
             }
-            if let service = profile.remoteBrowserService,
-               store.profiles.contains(where: { $0.id != profile.id && $0.remoteBrowserService == service }) {
-                ContentUnavailableView("接続先が共有されています", systemImage: "person.2.slash",
-                    description: Text("同じリモートブラウザを複数プロフィールで使っています。各プロフィールに別コンテナと別の接続先を設定してください。"))
+            if let host = profile.remoteEnvironmentHost,
+               store.profiles.contains(where: { $0.id != profile.id && $0.remoteEnvironmentHost == host }) {
+                ContentUnavailableView("独立環境になっていません", systemImage: "person.2.slash",
+                    description: Text("同じホストを複数プロフィールで使っています。別プロフィールには別VM・別ホストの専用ブラウザを設定してください。"))
             } else if let url = profile.remoteBrowserURL {
                 RemoteBrowserCanvas(profileID: profile.id, endpoint: url, errorMessage: $errorMessage)
                     .id(reloadID.uuidString + url.absoluteString)
             } else {
                 ContentUnavailableView("接続先が必要です", systemImage: "network",
-                    description: Text("プロフィール編集で専用ブラウザのHTTPS URLを設定してください。"))
+                    description: Text("プロフィール編集で別VM・別ホストの専用ブラウザHTTPS URLを設定してください。"))
             }
         }
     }
