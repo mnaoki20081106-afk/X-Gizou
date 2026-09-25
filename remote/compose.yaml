@@ -9,8 +9,9 @@ services:
         marker=/config/.xgizou-environment-id
         if [ ! -s "$$marker" ]; then
           umask 077
-          cat /proc/sys/kernel/random/uuid > "$$marker"
+          cat /proc/sys/kernel/random/uuid > "$marker"
         fi
+        chmod 0644 "$marker"
         test "$$(wc -c < "$$marker")" -le 64
         grep -Eq '^[0-9a-fA-F-]{36}[[:space:]]*$' "$$marker"
     volumes:
