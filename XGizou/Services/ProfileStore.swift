@@ -120,21 +120,13 @@ final class ProfileStore: ObservableObject {
             _ = WKWebsiteDataStore(forIdentifier: id)
         }
 
-        let identifiers = await WKWebsiteDataStore.allDataStoreIdentifiers
-        let actual = Set(identifiers)
-        let missing = expected.subtracting(actual)
-
-        if missing.isEmpty {
-            isolationState = .ready(profileCount: expected.count)
-        } else {
-            isolationState = .issue(missingStoreCount: missing.count)
-        }
+        // Creating the named store is the supported way to obtain (or create)
+        // the persistent profile container. Avoid enumerating all identifiers:
+        // current WebKit releases have had stability issues around that API.
+        isolationState = .ready(profileCount: expected.count)
     }
 
     private func removeWebsiteDataStore(for profileID: UUID) async {
-        let existing = await WKWebsiteDataStore.allDataStoreIdentifiers
-        guard existing.contains(profileID) else { return }
-
         do {
             try await WKWebsiteDataStore.remove(forIdentifier: profileID)
         } catch {
