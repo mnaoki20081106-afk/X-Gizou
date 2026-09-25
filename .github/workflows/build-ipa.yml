@@ -30,7 +30,7 @@ jobs:
 
       - name: Test profile consistency and migration
         run: |
-          swiftc XGizou/Models/BrowserProfile.swift XGizou/Services/FingerprintSpoofer.swift Tests/profile-consistency.swift -o /tmp/xgizou-profile-tests
+          swiftc XGizou/Models/BrowserProfile.swift XGizou/Services/FingerprintSpoofer.swift XGizou/Services/RemoteEnvironmentVerifier.swift Tests/profile-consistency.swift -o /tmp/xgizou-profile-tests
           /tmp/xgizou-profile-tests
 
       - name: Install XcodeGen
@@ -86,6 +86,38 @@ jobs:
           for attempt in $(seq 1 60); do
             if curl --fail --silent http://127.0.0.1:3000/ -o /tmp/remote-index.html && docker compose exec -T chromium sh -c 'pgrep -x chromium || pgrep -x chrome || pgrep -x chromium-browse' >/dev/null; then
               test -s /tmp/remote-index.html
+              environment_id=$(curl --fail --silent http://127.0.0.1:3000/.well-known/xgizou-environment-id | tr -d '\r\n')
+              printf '%s' "$environment_id" | grep -Eq '^[0-9a-fA-F-]{36}          docker compose logs --tail=100
+          exit 1
+      - name: Verify profile containers have separate browsers and storage
+        run: |
+          XGIZOU_HTTP_PORT=3002 docker compose -p xgizou-profile-two up -d
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3002/ -o /tmp/remote-second.html &&
+               XGIZOU_HTTP_PORT=3002 docker compose -p xgizou-profile-two exec -T chromium pgrep -x chromium >/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+          test -s /tmp/remote-second.html
+          first_environment_id=$(curl --fail --silent http://127.0.0.1:3000/.well-known/xgizou-environment-id | tr -d '\r\n')
+          second_environment_id=$(curl --fail --silent http://127.0.0.1:3002/.well-known/xgizou-environment-id | tr -d '\r\n')
+          test -n "$first_environment_id" && test -n "$second_environment_id"
+          test "$first_environment_id" != "$second_environment_id"
+          first_id=$(docker compose ps -q chromium)
+          second_id=$(XGIZOU_HTTP_PORT=3002 docker compose -p xgizou-profile-two ps -q chromium)
+          test -n "$first_id" && test -n "$second_id" && test "$first_id" != "$second_id"
+          first_volume=$(docker inspect "$first_id" --format '{{range .Mounts}}{{if eq .Destination "/config"}}{{.Name}}{{end}}{{end}}')
+          second_volume=$(docker inspect "$second_id" --format '{{range .Mounts}}{{if eq .Destination "/config"}}{{.Name}}{{end}}{{end}}')
+          test -n "$first_volume" && test -n "$second_volume" && test "$first_volume" != "$second_volume"
+      - name: Stop temporary test browser
+        if: always()
+        run: |
+          XGIZOU_HTTP_PORT=3002 docker compose -p xgizou-profile-two down -v
+          docker compose down -v
+
+              marker_id=$(docker compose exec -T chromium cat /config/.xgizou-environment-id | tr -d '\r\n')
+              test "$environment_id" = "$marker_id"
               exit 0
             fi
             sleep 2
