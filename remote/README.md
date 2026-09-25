@@ -47,18 +47,17 @@ Tailscaleのアクセス権は自分の信頼できるデバイスだけに限�
 
 - ログインデータはDockerの`browser-profile`ボリュームに永続化します。
 - 同じURLは同じブラウザです。アプリのプロフィールだけを増やしてもサーバー側は分離しません。
-- 複数プロフィールには別コンテナ・別ボリューム・別の専用接続先を用意します。
-- 例えば以下では、Composeのプロジェクト名が各コンテナと`/config`のボリュームを分離します。空きメモリが足りなければ複数同時起動はしないでください。
+- 複数プロフィールを「独立ブラウザ環境」として使う場合は、プロフィールごとに別VM・別ホスト・別ブラウザ保存領域を用意します。
+- 同じVM上のポート違い・パス違いは、現在のアプリでは独立環境として保存できません。ホスト名が同じなら共有基盤と判断します。
+- 各VMでは同じ`compose.yaml`をそのまま使えます。VMごとにTailscaleへ参加させ、各VMのTailscale HTTPSホスト名をそれぞれのプロフィールへ設定してください。
 
 ```sh
-docker compose -p xgizou-profile-one up -d
-XGIZOU_HTTP_PORT=3002 docker compose -p xgizou-profile-two up -d
-tailscale serve --bg --https=443 http://127.0.0.1:3000
-tailscale serve --bg --https=8443 http://127.0.0.1:3002
+docker compose -p xgizou-profile up -d
+tailscale serve --bg http://127.0.0.1:3000
 tailscale serve status
 ```
 
-  iPhone側の各プロフィールには表示された別々のHTTPS URL（標準443と`:8443`）を入力します。同じホスト・ポートを別プロフィールで保存する操作はアプリが拒否します。既存データが重複している場合も接続を止めます。これで分離できるのはブラウザのプロセスと保存データです。両方のコンテナは同じVM上にあり、IPアドレスや基盤OS、物理ハードウェアは共通です。URLを変えるだけでXに「別端末」と判定されるわけではありません。
+  iPhone側では、プロフィールAにVM AのHTTPSホスト、プロフィールBにVM BのHTTPSホストを設定します。これにより、ブラウザプロセス・Cookie/LocalStorage/IndexedDB・OS環境・ネットワーク出口をプロフィール単位で分離できます。サービス側の最終的な端末分類は外部サービスの判定に依存するため保証はできませんが、同一iPhone内のWKWebView値を書き換える方式ではなく、実際に別のブラウザ実行環境を使う構成です。
 - アプリの削除・Cookie削除でサーバー側データは消えません。リモートブラウザ内でログアウト・データ削除します。
 - `docker compose down`はデータを残します。`down -v`はログイン情報も削除するため通常は使用しません。
 - ブラウザ更新は`docker compose pull`のあと`docker compose up -d`。`latest`を固定したい場合は確認済みイメージのdigestへ変更してください。
