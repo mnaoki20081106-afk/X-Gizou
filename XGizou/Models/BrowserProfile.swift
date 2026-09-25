@@ -230,6 +230,7 @@ struct BrowserProfile: Identifiable, Codable, Hashable {
     var createdAt: Date
     var executionMode: BrowserExecutionMode?
     var remoteBrowserAddress: String?
+    var remoteEnvironmentID: String?
 
     var effectiveExecutionMode: BrowserExecutionMode { executionMode ?? .onDevice }
 
@@ -264,6 +265,11 @@ struct BrowserProfile: Identifiable, Codable, Hashable {
         return host
     }
 
+    var normalizedRemoteEnvironmentID: String? {
+        guard let raw = remoteEnvironmentID else { return nil }
+        return RemoteEnvironmentVerifier.normalizedIdentity(raw)
+    }
+
     init(
         id: UUID = UUID(),
         name: String = "新しいプロフィール",
@@ -282,6 +288,7 @@ struct BrowserProfile: Identifiable, Codable, Hashable {
         self.customDevice = customDevice
         self.fingerprintOptions = fingerprintOptions ?? FingerprintOptions.defaults(for: id)
         self.createdAt = createdAt
+        self.remoteEnvironmentID = nil
     }
 
     var effectiveUserAgent: String {
