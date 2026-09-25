@@ -3,12 +3,23 @@ import SwiftUI
 struct HomeView: View {
     @EnvironmentObject private var store: ProfileStore
 
+    let openProfiles: () -> Void
+    let openShadowban: () -> Void
+    let openEnvironment: () -> Void
+    let openSettings: () -> Void
+
     var body: some View {
         Group {
             if let profile = store.selectedProfile {
                 if profile.effectiveExecutionMode == .remote {
-                    RemoteBrowserScreen(profile: profile)
-                        .id(profile.id)
+                    RemoteBrowserScreen(
+                        profile: profile,
+                        openProfiles: openProfiles,
+                        openShadowban: openShadowban,
+                        openEnvironment: openEnvironment,
+                        openSettings: openSettings
+                    )
+                    .id(profile.id)
                 } else {
                     BrowserScreen(profile: profile)
                         .id(profile.id)
