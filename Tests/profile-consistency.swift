@@ -76,6 +76,9 @@ struct ProfileConsistencyTests {
         precondition(conflicting.remoteEnvironmentHost != profile.remoteEnvironmentHost)
         conflicting.remoteEnvironmentID = profile.remoteEnvironmentID
         precondition(conflicting.normalizedRemoteEnvironmentID == profile.normalizedRemoteEnvironmentID)
+        var localAgain = conflicting
+        localAgain.executionMode = .onDevice
+        precondition(localAgain.normalizedRemoteEnvironmentID == nil)
         precondition(FingerprintSpoofer.userScript(for: profile) == nil)
         for invalid in ["http://server/", "https://user:pass@server/", "https://server/?token=secret", "https://server/#token", "https://"] {
             profile.remoteBrowserAddress = invalid
