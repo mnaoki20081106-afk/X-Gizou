@@ -23,7 +23,7 @@ struct ProfileEditorView: View {
                     TextField("名前", text: $draft.name)
                     Picker("ブラウザ", selection: executionModeSelection) {
                         Text("iPhone内").tag(BrowserExecutionMode.onDevice)
-                        Text("リモート").tag(BrowserExecutionMode.remote)
+                        Text("独立環境").tag(BrowserExecutionMode.remote)
                     }
                 }
 
@@ -34,13 +34,13 @@ struct ProfileEditorView: View {
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                         if remoteServiceIsShared {
-                            Text("この接続先は別のプロフィールが使用中です。専用ブラウザの接続先を指定してください。")
+                            Text("このホストは別のプロフィールが使用中です。別プロフィールには別VM・別ホストの専用ブラウザを指定してください。")
                                 .foregroundStyle(.red)
                         }
                     } header: {
                         Text("接続先")
                     } footer: {
-                        Text("専用のブラウザと保存領域をサーバー側に用意してください。UAや描画情報はリモートブラウザの実際の値を使います。")
+                        Text("プロフィールごとに別VM・別ホストの専用ブラウザを用意してください。Xはそのリモート環境の実際のOS・ブラウザ・保存領域・ネットワーク出口を利用します。同じiPhone内の値は注入しません。")
                     }
                 } else {
                     Section {
@@ -147,8 +147,8 @@ struct ProfileEditorView: View {
     }
 
     private var remoteServiceIsShared: Bool {
-        guard let service = draft.remoteBrowserService else { return false }
-        return store.profiles.contains { $0.id != draft.id && $0.remoteBrowserService == service }
+        guard let host = draft.remoteEnvironmentHost else { return false }
+        return store.profiles.contains { $0.id != draft.id && $0.remoteEnvironmentHost == host }
     }
 
     private var userAgentSelection: Binding<UserAgentPreset> {
