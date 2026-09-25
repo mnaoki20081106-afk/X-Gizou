@@ -2,6 +2,9 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject private var store: ProfileStore
+
+    var openShadowban: () -> Void = {}
+    var openEnvironment: () -> Void = {}
     @AppStorage(RiskReductionPolicy.enabledKey) private var riskReductionMode = true
     @State private var clearing = false
     @State private var message: String?
@@ -42,6 +45,30 @@ struct SettingsView: View {
                     #else
                     Text("通常版ではプロフィール分離と外部リンク分離を常時適用します。UAとフィンガープリントは各プロフィール設定を使用します。")
                     #endif
+                }
+
+                Section("ツール") {
+                    Button(action: openShadowban) {
+                        HStack {
+                            Label("BANチェック", systemImage: "magnifyingglass.circle.fill")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption.bold())
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .foregroundStyle(.primary)
+
+                    Button(action: openEnvironment) {
+                        HStack {
+                            Label("環境", systemImage: "viewfinder.circle.fill")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption.bold())
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .foregroundStyle(.primary)
                 }
 
                 Section("ブラウザデータ") {
