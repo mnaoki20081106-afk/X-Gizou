@@ -1,7 +1,27 @@
 name: xgizou-remote
 services:
+  environment-init:
+    image: alpine:3.22
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        marker=/config/.xgizou-environment-id
+        if [ ! -s "$marker" ]; then
+          umask 077
+          cat /proc/sys/kernel/random/uuid > "$marker"
+        fi
+        test "$(wc -c < "$marker")" -le 64
+        grep -Eq '^[0-9a-fA-F-]{36}[[:space:]]*$' "$marker"
+    volumes:
+      - browser-profile:/config
+    restart: "no"
+
   chromium:
     image: lscr.io/linuxserver/chromium:latest
+    depends_on:
+      environment-init:
+        condition: service_completed_successfully
     environment:
       PUID: "1000"
       PGID: "1000"
@@ -10,9 +30,24 @@ services:
       CHROME_CLI: https://x.com/home
     volumes:
       - browser-profile:/config
-    ports:
-      - "127.0.0.1:${XGIZOU_HTTP_PORT:-3000}:3000"
+    expose:
+      - "3000"
     shm_size: "1gb"
     restart: unless-stopped
+
+  gateway:
+    image: nginx:1.27-alpine
+    depends_on:
+      environment-init:
+        condition: service_completed_successfully
+      chromium:
+        condition: service_started
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - browser-profile:/browser-profile:ro
+    ports:
+      - "127.0.0.1:${XGIZOU_HTTP_PORT:-3000}:3000"
+    restart: unless-stopped
+
 volumes:
   browser-profile:
