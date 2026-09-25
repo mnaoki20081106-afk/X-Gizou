@@ -266,7 +266,8 @@ struct BrowserProfile: Identifiable, Codable, Hashable {
     }
 
     var normalizedRemoteEnvironmentID: String? {
-        guard let raw = remoteEnvironmentID else { return nil }
+        guard effectiveExecutionMode == .remote,
+              let raw = remoteEnvironmentID else { return nil }
         return RemoteEnvironmentVerifier.normalizedIdentity(raw)
     }
 
