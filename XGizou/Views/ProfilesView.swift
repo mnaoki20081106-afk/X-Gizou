@@ -17,6 +17,14 @@ struct ProfilesView: View {
                 }
                 #endif
 
+                Section("iPhone内の分離") {
+                    isolationStatusRow
+
+                    Text("オンデバイスの各プロフィールは、Cookie・LocalStorage・IndexedDB・キャッシュを別々の永続WebKitデータストアに保存します。これはブラウザデータの分離であり、同じiPhoneを物理的な別端末として扱わせることを保証するものではありません。")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
                 Section("プロファイル") {
                     if store.profiles.isEmpty {
                         ContentUnavailableView(
@@ -73,6 +81,9 @@ struct ProfilesView: View {
                     }
                 }
             }
+            .refreshable {
+                await store.refreshIsolationState()
+            }
         }
         .sheet(isPresented: $showingNewProfile) {
             ProfileEditorView(profile: nil) { profile in
@@ -83,6 +94,40 @@ struct ProfilesView: View {
         .sheet(item: $editingProfile) { profile in
             ProfileEditorView(profile: profile) { updated in
                 store.save(updated)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var isolationStatusRow: some View {
+        switch store.isolationState {
+        case .checking:
+            HStack {
+                Label("分離状態を確認中", systemImage: "hourglass")
+                Spacer()
+                ProgressView()
+            }
+
+        case .ready(let profileCount):
+            Label(
+                profileCount == 0
+                    ? "オンデバイスプロフィール未作成"
+                    : "\(profileCount)件のプロフィールを独立保存",
+                systemImage: profileCount == 0 ? "circle.dashed" : "checkmark.shield.fill"
+            )
+            .foregroundStyle(profileCount == 0 ? .secondary : .green)
+
+        case .issue(let missingStoreCount):
+            VStack(alignment: .leading, spacing: 6) {
+                Label(
+                    "\(missingStoreCount)件の保存領域を確認できません",
+                    systemImage: "exclamationmark.triangle.fill"
+                )
+                .foregroundStyle(.orange)
+
+                Button("再確認") {
+                    Task { await store.refreshIsolationState() }
+                }
             }
         }
     }
