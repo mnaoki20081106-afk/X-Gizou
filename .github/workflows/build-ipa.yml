@@ -103,6 +103,9 @@ jobs:
               printf '%s' "$environment_id" | grep -Eq '^[0-9a-fA-F-]{36}$'
               marker_id=$(docker compose exec -T chromium cat /config/.xgizou-environment-id | tr -d '\r\n')
               test "$environment_id" = "$marker_id"
+              docker compose exec -T chromium sh -c 'printf "%s\n" "$CHROME_CLI" | grep -F -- "--app=https://x.com/home"'
+              docker compose exec -T chromium sh -c 'test "$SELKIES_MANUAL_WIDTH" = "393" && test "$SELKIES_MANUAL_HEIGHT" = "852"'
+              docker compose exec -T chromium sh -c 'printf "%s\n" "$SELKIES_UI_SHOW_SIDEBAR" | grep -F "false"'
               exit 0
             fi
             sleep 2
