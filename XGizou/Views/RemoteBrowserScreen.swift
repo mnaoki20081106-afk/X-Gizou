@@ -3,7 +3,13 @@ import WebKit
 
 struct RemoteBrowserScreen: View {
     @EnvironmentObject private var store: ProfileStore
+
     let profile: BrowserProfile
+    let openProfiles: () -> Void
+    let openShadowban: () -> Void
+    let openEnvironment: () -> Void
+    let openSettings: () -> Void
+
     @State private var reloadID = UUID()
     @State private var errorMessage: String?
     @State private var environmentVerified = false
@@ -11,62 +17,169 @@ struct RemoteBrowserScreen: View {
     @State private var verificationMessage: String?
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                VStack(alignment: .leading) {
-                    Text(profile.name).font(.headline)
-                    Text(profile.remoteBrowserURL?.host ?? "接続先未設定")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                Spacer()
-                Button {
-                    errorMessage = nil
-                    verificationMessage = nil
-                    environmentVerified = false
-                    reloadID = UUID()
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                }
-                .accessibilityLabel("リモートブラウザへ再接続")
+        ZStack(alignment: .topTrailing) {
+            Color(uiColor: .systemBackground)
+                .ignoresSafeArea()
+
+            remoteContent
+
+            if profile.remoteBrowserURL != nil {
+                controlMenu
+                    .padding(.top, 8)
+                    .padding(.trailing, 8)
             }
-            .padding()
-            if let errorMessage {
-                Text(errorMessage)
-                    .font(.callout).foregroundStyle(.orange).padding()
-            }
-            if let host = profile.remoteEnvironmentHost,
-               store.profiles.contains(where: { $0.id != profile.id && $0.remoteEnvironmentHost == host }) {
-                ContentUnavailableView("独立環境になっていません", systemImage: "person.2.slash",
-                    description: Text("同じホストを複数プロフィールで使っています。別プロフィールには別VM・別ホストの専用ブラウザを設定してください。"))
-            } else if let url = profile.remoteBrowserURL {
-                if environmentVerified {
-                    RemoteBrowserCanvas(profileID: profile.id, endpoint: url, errorMessage: $errorMessage)
-                        .id(reloadID.uuidString + url.absoluteString)
-                } else if isVerifyingEnvironment {
-                    VStack(spacing: 12) {
-                        ProgressView()
-                        Text("独立環境を確認中")
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if let verificationMessage {
-                    ContentUnavailableView(
-                        "独立環境を確認できません",
-                        systemImage: "exclamationmark.shield.fill",
-                        description: Text(verificationMessage)
-                    )
-                } else {
-                    ProgressView()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
-            } else {
-                ContentUnavailableView("接続先が必要です", systemImage: "network",
-                    description: Text("プロフィール編集で別VM・別ホストの専用ブラウザHTTPS URLを設定してください。"))
+
+            if let errorMessage, environmentVerified {
+                connectionErrorCard(errorMessage)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 58)
             }
         }
+        .toolbar(.hidden, for: .tabBar)
         .task(id: reloadID) {
             await verifyEnvironment()
         }
+    }
+
+    @ViewBuilder
+    private var remoteContent: some View {
+        if let host = profile.remoteEnvironmentHost,
+           store.profiles.contains(where: { $0.id != profile.id && $0.remoteEnvironmentHost == host }) {
+            unavailableView(
+                title: "独立環境になっていません",
+                symbol: "person.2.slash",
+                message: "同じホストを複数プロフィールで使っています。別プロフィールには別VM・別ホストの専用ブラウザを設定してください。"
+            )
+        } else if let url = profile.remoteBrowserURL {
+            if environmentVerified {
+                RemoteBrowserCanvas(
+                    profileID: profile.id,
+                    endpoint: url,
+                    errorMessage: $errorMessage
+                )
+                .id(reloadID.uuidString + url.absoluteString)
+            } else if isVerifyingEnvironment {
+                VStack(spacing: 14) {
+                    ProgressView()
+                        .controlSize(.large)
+                    Text("Xを起動しています")
+                        .font(.headline)
+                    Text("独立ブラウザ環境を確認中")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let verificationMessage {
+                VStack(spacing: 16) {
+                    Image(systemName: "exclamationmark.shield.fill")
+                        .font(.system(size: 44))
+                        .foregroundStyle(.orange)
+                    Text("独立環境を確認できません")
+                        .font(.title3.bold())
+                    Text(verificationMessage)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 28)
+                    Button("再接続") {
+                        reconnect()
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ProgressView()
+                    .controlSize(.large)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        } else {
+            unavailableView(
+                title: "接続先が必要です",
+                symbol: "network",
+                message: "プロフィール編集で別VM・別ホストの専用ブラウザHTTPS URLを設定してください。"
+            )
+        }
+    }
+
+    private var controlMenu: some View {
+        Menu {
+            Button {
+                reconnect()
+            } label: {
+                Label("再接続", systemImage: "arrow.clockwise")
+            }
+
+            Divider()
+
+            Button(action: openProfiles) {
+                Label("プロファイル", systemImage: "person.2.fill")
+            }
+
+            Button(action: openShadowban) {
+                Label("BANチェック", systemImage: "magnifyingglass.circle.fill")
+            }
+
+            Button(action: openEnvironment) {
+                Label("環境", systemImage: "viewfinder.circle.fill")
+            }
+
+            Button(action: openSettings) {
+                Label("設定", systemImage: "gearshape.fill")
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(.primary)
+                .frame(width: 36, height: 36)
+                .background(.ultraThinMaterial, in: Circle())
+                .contentShape(Circle())
+        }
+        .accessibilityLabel("X-Gizouメニュー")
+    }
+
+    private func connectionErrorCard(_ message: String) -> some View {
+        VStack(spacing: 10) {
+            Text("接続が途切れました")
+                .font(.headline)
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .lineLimit(4)
+            Button("再接続") {
+                reconnect()
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .padding(16)
+        .frame(maxWidth: 360)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .shadow(radius: 12)
+    }
+
+    private func unavailableView(title: String, symbol: String, message: String) -> some View {
+        VStack(spacing: 14) {
+            Image(systemName: symbol)
+                .font(.system(size: 44))
+                .foregroundStyle(.secondary)
+            Text(title)
+                .font(.title3.bold())
+            Text(message)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 28)
+            Button("プロファイルを開く", action: openProfiles)
+                .buttonStyle(.borderedProminent)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func reconnect() {
+        errorMessage = nil
+        verificationMessage = nil
+        environmentVerified = false
+        reloadID = UUID()
     }
 
     @MainActor
@@ -112,8 +225,9 @@ struct RemoteBrowserScreen: View {
     }
 }
 
-// This WebView displays only the remote-control client. X itself is rendered by
-// the server browser; no local UA or fingerprint script is injected into it.
+// The local WKWebView only renders the remote-control client. X itself runs in
+// the dedicated Chromium environment. Browser chrome and X-Gizou navigation are
+// kept out of the primary surface so the remote X view behaves like a focused app.
 private struct RemoteBrowserCanvas: UIViewRepresentable {
     let profileID: UUID
     let endpoint: URL
@@ -126,9 +240,18 @@ private struct RemoteBrowserCanvas: UIViewRepresentable {
         configuration.websiteDataStore = WKWebsiteDataStore(forIdentifier: profileID)
         configuration.allowsInlineMediaPlayback = true
         configuration.mediaTypesRequiringUserActionForPlayback = []
+
         let view = WKWebView(frame: .zero, configuration: configuration)
         view.navigationDelegate = context.coordinator
         view.uiDelegate = context.coordinator
+        view.isOpaque = false
+        view.backgroundColor = .systemBackground
+        view.scrollView.backgroundColor = .systemBackground
+        view.scrollView.contentInsetAdjustmentBehavior = .never
+        view.scrollView.bounces = false
+        view.scrollView.showsHorizontalScrollIndicator = false
+        view.scrollView.showsVerticalScrollIndicator = false
+        view.scrollView.keyboardDismissMode = .interactive
         view.load(URLRequest(url: endpoint))
         return view
     }
@@ -145,7 +268,10 @@ private struct RemoteBrowserCanvas: UIViewRepresentable {
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         var parent: RemoteBrowserCanvas
-        init(parent: RemoteBrowserCanvas) { self.parent = parent }
+
+        init(parent: RemoteBrowserCanvas) {
+            self.parent = parent
+        }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             parent.errorMessage = nil
@@ -161,7 +287,7 @@ private struct RemoteBrowserCanvas: UIViewRepresentable {
 
         private func show(_ error: Error) {
             guard (error as NSError).code != NSURLErrorCancelled else { return }
-            parent.errorMessage = "接続できませんでした。サーバーの起動とTailscale接続を確認してください。\n" + error.localizedDescription
+            parent.errorMessage = "サーバーの起動とTailscale接続を確認してください。\n" + error.localizedDescription
         }
 
         private func sameOrigin(_ url: URL) -> Bool {
@@ -170,26 +296,36 @@ private struct RemoteBrowserCanvas: UIViewRepresentable {
             (url.port ?? 443) == (parent.endpoint.port ?? 443)
         }
 
-        func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
-                     decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        func webView(
+            _ webView: WKWebView,
+            decidePolicyFor navigationAction: WKNavigationAction,
+            decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
+        ) {
             guard let url = navigationAction.request.url else {
                 decisionHandler(.cancel)
                 return
             }
+
             if navigationAction.targetFrame?.isMainFrame == false {
                 decisionHandler(url.scheme == "https" || url.scheme == "about" || url.scheme == "blob" ? .allow : .cancel)
                 return
             }
+
             guard sameOrigin(url) else {
                 parent.errorMessage = "接続先以外への画面遷移を止めました。Xの操作はリモート画面内で行ってください。"
                 decisionHandler(.cancel)
                 return
             }
+
             decisionHandler(.allow)
         }
 
-        func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
-                     for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+        func webView(
+            _ webView: WKWebView,
+            createWebViewWith configuration: WKWebViewConfiguration,
+            for navigationAction: WKNavigationAction,
+            windowFeatures: WKWindowFeatures
+        ) -> WKWebView? {
             if let url = navigationAction.request.url, sameOrigin(url) {
                 webView.load(navigationAction.request)
             }
