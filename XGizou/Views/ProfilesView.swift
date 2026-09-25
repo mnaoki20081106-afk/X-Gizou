@@ -44,7 +44,11 @@ struct ProfilesView: View {
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text(profile.name)
                                             .foregroundStyle(.primary)
-                                        Text(profile.effectiveExecutionMode == .remote ? "リモート • サーバー側セッション" : "ブラウザデータ分離 • iOS WebKit")
+                                        Text(profile.effectiveExecutionMode == .remote
+                                             ? (profile.normalizedRemoteEnvironmentID == nil
+                                                ? "独立ブラウザ • 環境ID未確認"
+                                                : "独立ブラウザ • 環境ID確認済み")
+                                             : "ブラウザデータ分離 • iOS WebKit")
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
                                     }
