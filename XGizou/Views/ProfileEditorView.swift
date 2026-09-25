@@ -9,6 +9,9 @@ struct ProfileEditorView: View {
     @State private var draft: BrowserProfile
     @State private var showsAdvanced = false
     @State private var showsIndividualSettings = false
+    @State private var isVerifyingRemote = false
+    @State private var remoteVerificationMessage: String?
+    @State private var remoteVerificationFailed = false
 
     init(profile: BrowserProfile?, onSave: @escaping (BrowserProfile) -> Void) {
         isNew = profile == nil
@@ -37,6 +40,36 @@ struct ProfileEditorView: View {
                             Text("このホストは別のプロフィールが使用中です。別プロフィールには別VM・別ホストの専用ブラウザを指定してください。")
                                 .foregroundStyle(.red)
                         }
+
+                        if remoteIdentityIsShared {
+                            Text("このブラウザ実体は別のプロフィールですでに使用中です。別の独立環境を指定してください。")
+                                .foregroundStyle(.red)
+                        }
+
+                        if let identity = draft.normalizedRemoteEnvironmentID {
+                            Label("環境ID確認済み: \(String(identity.prefix(8)))…", systemImage: "checkmark.shield.fill")
+                                .foregroundStyle(.green)
+                        }
+
+                        if let remoteVerificationMessage {
+                            Text(remoteVerificationMessage)
+                                .font(.footnote)
+                                .foregroundStyle(remoteVerificationFailed ? Color.red : Color.secondary)
+                        }
+
+                        Button {
+                            Task { _ = await verifyRemoteEnvironment() }
+                        } label: {
+                            if isVerifyingRemote {
+                                HStack {
+                                    ProgressView()
+                                    Text("独立環境を確認中")
+                                }
+                            } else {
+                                Label("独立環境を確認", systemImage: "checkmark.shield")
+                            }
+                        }
+                        .disabled(draft.remoteBrowserURL == nil || remoteServiceIsShared || isVerifyingRemote)
                     } header: {
                         Text("接続先")
                     } footer: {
@@ -121,10 +154,7 @@ struct ProfileEditorView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("保存") {
-                        let trimmed = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
-                        draft.name = trimmed.isEmpty ? "名称未設定" : trimmed
-                        onSave(draft)
-                        dismiss()
+                        Task { await saveProfile() }
                     }
                     .disabled(!canSave)
                 }
@@ -137,18 +167,89 @@ struct ProfileEditorView: View {
     }
 
     private var remoteAddress: Binding<String> {
-        Binding(get: { draft.remoteBrowserAddress ?? "" }, set: { draft.remoteBrowserAddress = $0 })
+        Binding(
+            get: { draft.remoteBrowserAddress ?? "" },
+            set: { newValue in
+                if draft.remoteBrowserAddress != newValue {
+                    draft.remoteBrowserAddress = newValue
+                    draft.remoteEnvironmentID = nil
+                    remoteVerificationMessage = nil
+                    remoteVerificationFailed = false
+                }
+            }
+        )
     }
 
     private var canSave: Bool {
         draft.effectiveExecutionMode == .remote
-            ? draft.remoteBrowserService != nil && !remoteServiceIsShared
+            ? draft.remoteBrowserService != nil && !remoteServiceIsShared && !remoteIdentityIsShared && !isVerifyingRemote
             : hasValidTimezone
     }
 
     private var remoteServiceIsShared: Bool {
         guard let host = draft.remoteEnvironmentHost else { return false }
         return store.profiles.contains { $0.id != draft.id && $0.remoteEnvironmentHost == host }
+    }
+
+    private var remoteIdentityIsShared: Bool {
+        guard let identity = draft.normalizedRemoteEnvironmentID else { return false }
+        return store.profiles.contains {
+            $0.id != draft.id && $0.normalizedRemoteEnvironmentID == identity
+        }
+    }
+
+    @MainActor
+    private func verifyRemoteEnvironment() async -> Bool {
+        guard let endpoint = draft.remoteBrowserURL else {
+            remoteVerificationFailed = true
+            remoteVerificationMessage = "有効なHTTPS接続先を入力してください。"
+            return false
+        }
+
+        isVerifyingRemote = true
+        remoteVerificationFailed = false
+        remoteVerificationMessage = nil
+        defer { isVerifyingRemote = false }
+
+        do {
+            let identity = try await RemoteEnvironmentVerifier.fetchIdentity(from: endpoint)
+
+            if let existing = draft.normalizedRemoteEnvironmentID, existing != identity {
+                remoteVerificationFailed = true
+                remoteVerificationMessage = "保存済みの環境IDと接続先の環境IDが一致しません。接続先が入れ替わっていないか確認してください。"
+                return false
+            }
+
+            if store.profiles.contains(where: {
+                $0.id != draft.id && $0.normalizedRemoteEnvironmentID == identity
+            }) {
+                remoteVerificationFailed = true
+                remoteVerificationMessage = "別プロフィールと同じブラウザ実体が返されました。独立環境として保存できません。"
+                return false
+            }
+
+            draft.remoteEnvironmentID = identity
+            remoteVerificationFailed = false
+            remoteVerificationMessage = "ブラウザ保存領域に固有の環境IDを確認しました。"
+            return true
+        } catch {
+            remoteVerificationFailed = true
+            remoteVerificationMessage = "独立環境を確認できませんでした: \(error.localizedDescription)"
+            return false
+        }
+    }
+
+    @MainActor
+    private func saveProfile() async {
+        let trimmed = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        draft.name = trimmed.isEmpty ? "名称未設定" : trimmed
+
+        if draft.effectiveExecutionMode == .remote {
+            guard await verifyRemoteEnvironment() else { return }
+        }
+
+        onSave(draft)
+        dismiss()
     }
 
     private var userAgentSelection: Binding<UserAgentPreset> {
