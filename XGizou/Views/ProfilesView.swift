@@ -115,7 +115,7 @@ struct ProfilesView: View {
                     : "\(profileCount)件のプロフィールを独立保存",
                 systemImage: profileCount == 0 ? "circle.dashed" : "checkmark.shield.fill"
             )
-            .foregroundStyle(profileCount == 0 ? .secondary : .green)
+            .foregroundStyle(profileCount == 0 ? Color.secondary : Color.green)
 
         case .issue(let missingStoreCount):
             VStack(alignment: .leading, spacing: 6) {
