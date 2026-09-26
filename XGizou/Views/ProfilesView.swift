@@ -2,6 +2,9 @@ import SwiftUI
 
 struct ProfilesView: View {
     @EnvironmentObject private var store: ProfileStore
+
+    var onOpenSelectedProfile: () -> Void = {}
+
     @State private var showingNewProfile = false
     @State private var editingProfile: BrowserProfile?
 
@@ -36,6 +39,7 @@ struct ProfilesView: View {
                         ForEach(store.profiles) { profile in
                             Button {
                                 store.select(profile)
+                                onOpenSelectedProfile()
                             } label: {
                                 HStack(spacing: 14) {
                                     Image(systemName: "person.crop.circle")
@@ -56,8 +60,13 @@ struct ProfilesView: View {
                                     Spacer()
 
                                     if store.selectedProfileID == profile.id {
-                                        Image(systemName: "checkmark.circle.fill")
+                                        Text("使用中")
+                                            .font(.caption.bold())
                                             .foregroundStyle(.blue)
+                                    } else {
+                                        Image(systemName: "chevron.right")
+                                            .font(.caption.bold())
+                                            .foregroundStyle(.tertiary)
                                     }
 
                                     Button {
@@ -93,6 +102,7 @@ struct ProfilesView: View {
             ProfileEditorView(profile: nil) { profile in
                 store.save(profile)
                 store.select(profile)
+                onOpenSelectedProfile()
             }
         }
         .sheet(item: $editingProfile) { profile in
