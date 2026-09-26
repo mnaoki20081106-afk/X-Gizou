@@ -96,7 +96,7 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
     }
 
     func loadHome() {
-        load(URL(string: "https://x.com/home")!)
+        load(BrowserRuntimeConfiguration.homeURL)
     }
 
     func load(_ url: URL) {
