@@ -52,15 +52,7 @@ enum RiskReductionPolicy {
     }
 
     static func shouldOpenTopLevelExternally(_ url: URL) -> Bool {
-        guard isEnabled else { return false }
-        guard let scheme = url.scheme?.lowercased(), ["http", "https"].contains(scheme) else {
-            return false
-        }
-        guard let host = url.host?.lowercased() else {
-            return false
-        }
-
-        return !isXHost(host)
+        BrowserHostPolicy.shouldOpenTopLevelExternally(url, protectionEnabled: isEnabled)
     }
 
     static func shouldBlockExternalScheme(_ scheme: String) -> Bool {
@@ -74,10 +66,7 @@ enum RiskReductionPolicy {
     }
 
     static func isXHost(_ host: String) -> Bool {
-        host == "x.com" ||
-        host.hasSuffix(".x.com") ||
-        host == "twitter.com" ||
-        host.hasSuffix(".twitter.com")
+        BrowserHostPolicy.isXHost(host)
     }
 }
 
