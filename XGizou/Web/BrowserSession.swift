@@ -43,6 +43,9 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
         webView.uiDelegate = self
         webView.allowsBackForwardNavigationGestures = true
         webView.allowsLinkPreview = true
+        webView.isOpaque = false
+        webView.backgroundColor = .systemBackground
+        webView.scrollView.backgroundColor = .systemBackground
 
         apply(profile: profile)
         refreshState()
