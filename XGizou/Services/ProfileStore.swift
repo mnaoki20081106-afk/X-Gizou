@@ -20,8 +20,27 @@ final class ProfileStore: ObservableObject {
     private let selectedProfileKey = "xgizou.selectedProfile.v1"
 
     init() {
+        #if DEBUG
+        let isUITest = ProcessInfo.processInfo.arguments.contains("--ui-test-seed-profiles")
+        if isUITest {
+            UserDefaults.standard.removeObject(forKey: profilesKey)
+            UserDefaults.standard.removeObject(forKey: selectedProfileKey)
+            RiskReductionPolicy.setEnabled(false)
+        } else {
+            RiskReductionPolicy.bootstrap()
+        }
+        #else
         RiskReductionPolicy.bootstrap()
+        #endif
+
         load()
+
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--ui-test-seed-profiles") {
+            seedUITestProfiles()
+        }
+        #endif
+
         Task { await refreshIsolationState() }
     }
 
@@ -180,6 +199,16 @@ final class ProfileStore: ObservableObject {
             UserDefaults.standard.set(data, forKey: profilesKey)
         }
     }
+
+    #if DEBUG
+    private func seedUITestProfiles() {
+        let first = BrowserProfile(name: "UI Profile A")
+        let second = BrowserProfile(name: "UI Profile B")
+        profiles = [first, second]
+        selectedProfileID = first.id
+        persist()
+    }
+    #endif
 
     private func saveSelectedProfileID() {
         if let selectedProfileID {
