@@ -226,6 +226,13 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
             return
         }
 
+        #if DEBUG
+        if BrowserRuntimeConfiguration.isUITestHomeURL(url) {
+            decisionHandler(.allow)
+            return
+        }
+        #endif
+
         if ["http", "https"].contains(scheme) {
             let isTopLevel = navigationAction.targetFrame == nil || navigationAction.targetFrame?.isMainFrame == true
             if isTopLevel && RiskReductionPolicy.shouldOpenTopLevelExternally(url) {
