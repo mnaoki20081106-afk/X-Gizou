@@ -28,7 +28,7 @@ services:
       PGID: "1000"
       TZ: Asia/Tokyo
       LC_ALL: ja_JP.UTF-8
-      CHROME_CLI: "--app=https://x.com/home --start-maximized --no-first-run --no-default-browser-check --disable-session-crashed-bubble"
+      CHROME_CLI: "--app=https://x.com/ --start-maximized --no-first-run --no-default-browser-check --disable-session-crashed-bubble"
       TITLE: X
       SELKIES_MANUAL_RESOLUTION: "true|locked"
       SELKIES_MANUAL_WIDTH: "393"
