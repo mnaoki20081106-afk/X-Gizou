@@ -2,9 +2,6 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject private var store: ProfileStore
-
-    var openShadowban: () -> Void = {}
-    var openEnvironment: () -> Void = {}
     @AppStorage(RiskReductionPolicy.enabledKey) private var riskReductionMode = true
     @State private var clearing = false
     @State private var message: String?
@@ -48,27 +45,17 @@ struct SettingsView: View {
                 }
 
                 Section("ツール") {
-                    Button(action: openShadowban) {
-                        HStack {
-                            Label("BANチェック", systemImage: "magnifyingglass.circle.fill")
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption.bold())
-                                .foregroundStyle(.tertiary)
-                        }
+                    NavigationLink {
+                        ShadowbanCheckView()
+                    } label: {
+                        Label("BANチェック", systemImage: "magnifyingglass.circle.fill")
                     }
-                    .foregroundStyle(.primary)
 
-                    Button(action: openEnvironment) {
-                        HStack {
-                            Label("環境", systemImage: "viewfinder.circle.fill")
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption.bold())
-                                .foregroundStyle(.tertiary)
-                        }
+                    NavigationLink {
+                        EnvironmentView()
+                    } label: {
+                        Label("環境", systemImage: "viewfinder.circle.fill")
                     }
-                    .foregroundStyle(.primary)
                 }
 
                 Section("ブラウザデータ") {
