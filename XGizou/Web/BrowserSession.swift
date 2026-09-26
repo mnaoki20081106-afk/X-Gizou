@@ -93,7 +93,7 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
     }
 
     func loadHome() {
-        load(URL(string: "https://x.com/")!)
+        load(URL(string: "https://x.com/home")!)
     }
 
     func load(_ url: URL) {
@@ -143,10 +143,12 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
     }
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        errorMessage = nil
         refreshState()
     }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        errorMessage = nil
         refreshState()
     }
 
@@ -164,15 +166,23 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-        errorMessage = "Xの表示プロセスが終了したため再読み込みします。"
-        webView.reload()
+        errorMessage = nil
+        if webView.url == nil {
+            loadHome()
+        } else {
+            webView.reload()
+        }
         refreshState()
     }
 
     private func handleNavigationError(_ error: Error) {
         refreshState()
-        let nsError = error as NSError
-        guard nsError.code != NSURLErrorCancelled else { return }
+
+        if BrowserNavigationErrorClassifier.shouldIgnore(error) {
+            errorMessage = nil
+            return
+        }
+
         errorMessage = "Xを読み込めませんでした。通信状態を確認して再試行してください。\n" + error.localizedDescription
     }
 
