@@ -43,6 +43,7 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
         webView.uiDelegate = self
         webView.allowsBackForwardNavigationGestures = true
         webView.allowsLinkPreview = true
+        webView.accessibilityIdentifier = "x-browser-webview"
         webView.isOpaque = false
         webView.backgroundColor = .systemBackground
         webView.scrollView.backgroundColor = .systemBackground
@@ -157,6 +158,11 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         errorMessage = nil
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["XGIZOU_TEST_HOME_URL"] != nil {
+            webView.accessibilityIdentifier = "x-browser-webview-loaded"
+        }
+        #endif
         refreshState()
     }
 
