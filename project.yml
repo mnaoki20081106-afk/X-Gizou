@@ -27,3 +27,17 @@ targets:
         CODE_SIGN_STYLE: Automatic
     scheme:
       gatherCoverageData: false
+      testTargets:
+        - XGizouUITests
+
+  XGizouUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - UITests
+    dependencies:
+      - target: XGizou
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.xgizou.app.uitests
+        GENERATE_INFOPLIST_FILE: YES
