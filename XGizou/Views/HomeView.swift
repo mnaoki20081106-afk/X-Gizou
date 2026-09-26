@@ -113,6 +113,8 @@ private struct BrowserScreen: View {
 }
 
 struct XBrowserHeader: View {
+    @EnvironmentObject private var store: ProfileStore
+
     let title: String
     let canGoBack: Bool
     let canGoForward: Bool
@@ -137,10 +139,34 @@ struct XBrowserHeader: View {
 
             Spacer(minLength: 4)
 
-            Text(title)
-                .font(.headline)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+            Menu {
+                ForEach(store.profiles) { profile in
+                    Button {
+                        store.select(profile)
+                    } label: {
+                        if store.selectedProfileID == profile.id {
+                            Label(profile.name, systemImage: "checkmark")
+                        } else {
+                            Text(profile.name)
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 5) {
+                    Text(title)
+                        .font(.headline)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+
+                    if store.profiles.count > 1 {
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.caption2.bold())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("プロフィールを切り替える")
 
             Spacer(minLength: 4)
 
