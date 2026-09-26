@@ -54,6 +54,23 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
+      - name: Run iOS simulator UI smoke test
+        run: |
+          set -o pipefail
+          SIMULATOR_ID=$(python3 - <<'PY'
+          import json, subprocess
+          data = json.loads(subprocess.check_output(["xcrun", "simctl", "list", "devices", "available", "-j"]))
+          for runtime, devices in data.get("devices", {}).items():
+              for device in devices:
+                  if device.get("isAvailable") and device.get("name", "").startswith("iPhone"):
+                      print(device["udid"])
+                      raise SystemExit(0)
+          raise SystemExit("No available iPhone simulator")
+          PY
+          )
+          test -n "$SIMULATOR_ID"
+          xcodebuild             -project XGizou.xcodeproj             -scheme XGizou             -configuration Debug             -destination "platform=iOS Simulator,id=$SIMULATOR_ID"             -derivedDataPath build-ui             -only-testing:XGizouUITests             test | tee xcodebuild-ui.log
+
       - name: Build unsigned app
         run: |
           set -o pipefail
@@ -85,12 +102,14 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Upload build log on failure
+      - name: Upload build logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: xcodebuild-log
-          path: xcodebuild.log
+          name: xcodebuild-logs
+          path: |
+            xcodebuild.log
+            xcodebuild-ui.log
           if-no-files-found: ignore
 
   remote-smoke:
