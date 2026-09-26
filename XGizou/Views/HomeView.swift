@@ -72,7 +72,34 @@ private struct BrowserScreen: View {
                 reload: session.reload
             )
 
-            BrowserWebView(webView: session.webView)
+            ZStack {
+                BrowserWebView(webView: session.webView)
+
+                if let errorMessage = session.errorMessage {
+                    VStack(spacing: 14) {
+                        Image(systemName: "wifi.exclamationmark")
+                            .font(.system(size: 38))
+                            .foregroundStyle(.orange)
+
+                        Text("Xを開けません")
+                            .font(.headline)
+
+                        Text(errorMessage)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+
+                        Button("再試行") {
+                            session.reload()
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                    .padding(20)
+                    .frame(maxWidth: 360)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .padding()
+                }
+            }
         }
         .background(Color(uiColor: .systemBackground))
         .onAppear {
