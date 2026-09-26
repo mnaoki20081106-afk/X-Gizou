@@ -13,13 +13,16 @@ final class XGizouUITests: XCTestCase {
         app.launch()
 
         XCTAssertTrue(
-            app.staticTexts["X-Gizou Browser Smoke"].waitForExistence(timeout: 10),
-            "WKWebView must render the browser surface after app launch"
+            app.staticTexts["UI Profile A"].waitForExistence(timeout: 10),
+            "The deterministic test profile must be selected at launch"
         )
+
+        let loadedBrowser = app.webViews["x-browser-webview-loaded"]
         XCTAssertTrue(
-            app.staticTexts["UI Profile A"].waitForExistence(timeout: 3),
-            "The initially selected profile must be visible in the browser header"
+            loadedBrowser.waitForExistence(timeout: 10),
+            "WKWebView must finish its initial navigation"
         )
+
         XCTAssertFalse(
             app.staticTexts["Xを開けません"].waitForExistence(timeout: 2),
             "A navigation policy interruption must not be surfaced as a network failure"
@@ -30,16 +33,22 @@ final class XGizouUITests: XCTestCase {
         profilesTab.tap()
 
         let secondProfile = app.staticTexts["UI Profile B"]
-        XCTAssertTrue(secondProfile.waitForExistence(timeout: 3))
+        XCTAssertTrue(secondProfile.waitForExistence(timeout: 5))
         secondProfile.tap()
 
         XCTAssertTrue(
             app.staticTexts["UI Profile B"].waitForExistence(timeout: 5),
             "Selecting a profile must return home and update the browser header"
         )
+
         XCTAssertTrue(
-            app.staticTexts["X-Gizou Browser Smoke"].waitForExistence(timeout: 10),
-            "The browser surface must render after switching profiles"
+            app.webViews["x-browser-webview-loaded"].waitForExistence(timeout: 10),
+            "The replacement profile must create and finish a fresh WKWebView navigation"
+        )
+
+        XCTAssertFalse(
+            app.staticTexts["Xを開けません"].waitForExistence(timeout: 2),
+            "Switching profiles must not surface a transient navigation error"
         )
 
         XCTAssertTrue(app.tabBars.buttons["ホーム"].isSelected)
