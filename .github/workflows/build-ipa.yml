@@ -38,6 +38,11 @@ jobs:
           swiftc XGizou/Services/BrowserHostPolicy.swift Tests/browser-host-policy.swift -o /tmp/xgizou-host-policy-tests
           /tmp/xgizou-host-policy-tests
 
+      - name: Test app navigation policy
+        run: |
+          swiftc XGizou/Services/AppNavigationPolicy.swift Tests/app-navigation-policy.swift -o /tmp/xgizou-app-navigation-tests
+          /tmp/xgizou-app-navigation-tests
+
       - name: Test profile consistency and migration
         run: |
           swiftc XGizou/Models/BrowserProfile.swift XGizou/Services/FingerprintSpoofer.swift XGizou/Services/RemoteEnvironmentVerifier.swift Tests/profile-consistency.swift -o /tmp/xgizou-profile-tests
