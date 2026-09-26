@@ -17,10 +17,9 @@ final class XGizouUITests: XCTestCase {
             "The deterministic test profile must be selected at launch"
         )
 
-        let loadedBrowser = app.webViews["x-browser-webview-loaded"]
         XCTAssertTrue(
-            loadedBrowser.waitForExistence(timeout: 10),
-            "WKWebView must finish its initial navigation"
+            app.staticTexts["X-Gizou Browser Smoke"].waitForExistence(timeout: 10),
+            "WKWebView must finish and render its initial navigation"
         )
 
         XCTAssertFalse(
@@ -42,8 +41,8 @@ final class XGizouUITests: XCTestCase {
         )
 
         XCTAssertTrue(
-            app.webViews["x-browser-webview-loaded"].waitForExistence(timeout: 10),
-            "The replacement profile must create and finish a fresh WKWebView navigation"
+            app.staticTexts["X-Gizou Browser Smoke"].waitForExistence(timeout: 10),
+            "The replacement profile must create, finish, and render a fresh WKWebView navigation"
         )
 
         XCTAssertFalse(
