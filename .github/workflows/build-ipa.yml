@@ -28,6 +28,16 @@ jobs:
       - name: Test fingerprint runtime
         run: node --test Tests/fingerprint-runtime.test.cjs
 
+      - name: Test WebKit navigation error handling
+        run: |
+          swiftc XGizou/Services/BrowserNavigationErrorClassifier.swift Tests/navigation-error-classifier.swift -o /tmp/xgizou-navigation-error-tests
+          /tmp/xgizou-navigation-error-tests
+
+      - name: Test X host navigation policy
+        run: |
+          swiftc XGizou/Services/BrowserHostPolicy.swift Tests/browser-host-policy.swift -o /tmp/xgizou-host-policy-tests
+          /tmp/xgizou-host-policy-tests
+
       - name: Test profile consistency and migration
         run: |
           swiftc XGizou/Models/BrowserProfile.swift XGizou/Services/FingerprintSpoofer.swift XGizou/Services/RemoteEnvironmentVerifier.swift Tests/profile-consistency.swift -o /tmp/xgizou-profile-tests
@@ -103,7 +113,7 @@ jobs:
               printf '%s' "$environment_id" | grep -Eq '^[0-9a-fA-F-]{36}$'
               marker_id=$(docker compose exec -T chromium cat /config/.xgizou-environment-id | tr -d '\r\n')
               test "$environment_id" = "$marker_id"
-              docker compose exec -T chromium sh -c 'printf "%s\n" "$CHROME_CLI" | grep -F -- "--app=https://x.com/"'
+              docker compose exec -T chromium sh -c 'printf "%s\n" "$CHROME_CLI" | grep -F -- "--app=https://x.com/home"'
               docker compose exec -T chromium sh -c 'test "$SELKIES_MANUAL_WIDTH" = "393" && test "$SELKIES_MANUAL_HEIGHT" = "852"'
               docker compose exec -T chromium sh -c 'printf "%s\n" "$SELKIES_UI_SHOW_SIDEBAR" | grep -F "false"'
               exit 0
