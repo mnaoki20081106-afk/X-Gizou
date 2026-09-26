@@ -13,6 +13,7 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
     @Published private(set) var isLoading = false
     @Published private(set) var title: String = ""
     @Published private(set) var currentURL: URL?
+    @Published private(set) var errorMessage: String?
 
     private var currentProfile: BrowserProfile
     private var policyObserver: NSObjectProtocol?
@@ -92,17 +93,20 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
     }
 
     func loadHome() {
-        load(URL(string: "https://x.com/home")!)
+        load(URL(string: "https://x.com/")!)
     }
 
     func load(_ url: URL) {
+        errorMessage = nil
+
         if RiskReductionPolicy.shouldOpenTopLevelExternally(url) {
             UIApplication.shared.open(url)
             return
         }
 
         var request = URLRequest(url: url)
-        request.cachePolicy = .useProtocolCachePolicy
+        request.cachePolicy = .reloadRevalidatingCacheData
+        request.timeoutInterval = 30
         webView.load(request)
     }
 
@@ -121,6 +125,7 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
     }
 
     func reload() {
+        errorMessage = nil
         if webView.url == nil {
             loadHome()
         } else {
@@ -146,15 +151,29 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        errorMessage = nil
         refreshState()
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-        refreshState()
+        handleNavigationError(error)
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        handleNavigationError(error)
+    }
+
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        errorMessage = "Xの表示プロセスが終了したため再読み込みします。"
+        webView.reload()
         refreshState()
+    }
+
+    private func handleNavigationError(_ error: Error) {
+        refreshState()
+        let nsError = error as NSError
+        guard nsError.code != NSURLErrorCancelled else { return }
+        errorMessage = "Xを読み込めませんでした。通信状態を確認して再試行してください。\n" + error.localizedDescription
     }
 
     func webView(
