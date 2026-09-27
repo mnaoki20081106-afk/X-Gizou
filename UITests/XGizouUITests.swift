@@ -5,6 +5,24 @@ final class XGizouUITests: XCTestCase {
         continueAfterFailure = false
     }
 
+    func testRealXHomeRendersNonBlank() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-test-seed-profiles"]
+        app.launchEnvironment["XGIZOU_REAL_X_SMOKE"] = "1"
+        app.launch()
+
+        let loadedWebView = app.webViews["x-browser-real-x-loaded"]
+        XCTAssertTrue(
+            loadedWebView.waitForExistence(timeout: 35),
+            "The real x.com/home page must render non-empty interactive content in WKWebView"
+        )
+
+        XCTAssertFalse(
+            app.staticTexts["Xを開けません"].exists,
+            "Real X must not end on the browser failure overlay"
+        )
+    }
+
     func testBrowserRendersAndProfileSwitchReturnsHome() throws {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-test-seed-profiles"]
