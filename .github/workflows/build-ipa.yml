@@ -28,6 +28,11 @@ jobs:
       - name: Test fingerprint runtime
         run: node --test Tests/fingerprint-runtime.test.cjs
 
+      - name: Test X browser compatibility user agent
+        run: |
+          swiftc XGizou/Services/BrowserCompatibilityPolicy.swift Tests/browser-compatibility-policy.swift -o /tmp/xgizou-browser-compatibility-tests
+          /tmp/xgizou-browser-compatibility-tests
+
       - name: Test WebKit navigation error handling
         run: |
           swiftc XGizou/Services/BrowserNavigationErrorClassifier.swift Tests/navigation-error-classifier.swift -o /tmp/xgizou-navigation-error-tests
