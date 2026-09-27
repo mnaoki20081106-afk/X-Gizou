@@ -11,6 +11,7 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
     @Published private(set) var canGoBack = false
     @Published private(set) var canGoForward = false
     @Published private(set) var isLoading = false
+    @Published private(set) var estimatedProgress = 0.0
     @Published private(set) var title: String = ""
     @Published private(set) var currentURL: URL?
     @Published private(set) var errorMessage: String?
@@ -18,7 +19,7 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
 
     private var currentProfile: BrowserProfile
     private var policyObserver: NSObjectProtocol?
-    private var renderValidationGeneration = 0
+    private var observations: [NSKeyValueObservation] = []
 
     init(profile: BrowserProfile) {
         profileID = profile.id
@@ -35,6 +36,8 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
         configuration.allowsInlineMediaPlayback = true
         configuration.mediaTypesRequiringUserActionForPlayback = []
 
+        // Keep the profile-specific browser presentation layer intact, but install
+        // it before the first navigation so WebKit does not need a mid-load reset.
         if let script = FingerprintSpoofer.userScript(for: profile) {
             configuration.userContentController.addUserScript(script)
         }
@@ -48,16 +51,13 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
         webView.allowsBackForwardNavigationGestures = true
         webView.allowsLinkPreview = true
         webView.accessibilityIdentifier = "x-browser-webview"
-
-        // Keep WKWebView opaque. A transparent WebKit backing layer can flash or
-        // remain black while a large SPA is creating its first composited frame.
         webView.isOpaque = true
         webView.backgroundColor = .systemBackground
         webView.scrollView.backgroundColor = .systemBackground
         webView.underPageBackgroundColor = .systemBackground
 
-        apply(profile: profile)
-        refreshState()
+        applyRuntimeProfile(profile)
+        observeWebView()
 
         policyObserver = NotificationCenter.default.addObserver(
             forName: .riskReductionPolicyChanged,
@@ -66,15 +66,16 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                self.apply(profile: self.currentProfile)
+                self.applyRuntimeProfile(self.currentProfile)
                 if self.webView.url != nil {
-                    self.reload()
+                    self.webView.reload()
                 }
             }
         }
     }
 
     deinit {
+        observations.forEach { $0.invalidate() }
         if let policyObserver {
             NotificationCenter.default.removeObserver(policyObserver)
         }
@@ -83,9 +84,7 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
     func apply(profile: BrowserProfile) {
         let changed = currentProfile != profile
         currentProfile = profile
-        webView.customUserAgent = RiskReductionPolicy.effectiveUserAgent(for: profile)
-        webView.configuration.defaultWebpagePreferences.preferredContentMode =
-            RiskReductionPolicy.preferredContentMode(for: profile)
+        applyRuntimeProfile(profile)
 
         let controller = webView.configuration.userContentController
         controller.removeAllUserScripts()
@@ -93,9 +92,12 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
             controller.addUserScript(script)
         }
 
-        webView.isInspectable = !RiskReductionPolicy.isEnabled
+        // User scripts are captured when a document starts. Reload only when the
+        // active profile settings actually changed, never as blank-page recovery.
         if changed && webView.url != nil {
-            reload()
+            hasRenderedContent = false
+            errorMessage = nil
+            webView.reload()
         }
     }
 
@@ -110,13 +112,12 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
 
     func load(_ url: URL) {
         errorMessage = nil
+        hasRenderedContent = false
 
         if RiskReductionPolicy.shouldOpenTopLevelExternally(url) {
             UIApplication.shared.open(url)
             return
         }
-
-        beginNavigation()
 
         var request = URLRequest(url: url)
         request.cachePolicy = .useProtocolCachePolicy
@@ -125,61 +126,99 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
     }
 
     func goBack() {
-        if webView.canGoBack {
-            beginNavigation()
-            webView.goBack()
-            refreshState()
-        }
+        guard webView.canGoBack else { return }
+        errorMessage = nil
+        hasRenderedContent = false
+        webView.goBack()
     }
 
     func goForward() {
-        if webView.canGoForward {
-            beginNavigation()
-            webView.goForward()
-            refreshState()
-        }
+        guard webView.canGoForward else { return }
+        errorMessage = nil
+        hasRenderedContent = false
+        webView.goForward()
     }
 
     func reload() {
         errorMessage = nil
-        beginNavigation()
+
+        if webView.isLoading {
+            webView.stopLoading()
+            return
+        }
+
+        hasRenderedContent = false
         if webView.url == nil {
             loadHome()
         } else {
             webView.reload()
         }
-        refreshState()
     }
 
-    private func beginNavigation() {
-        hasRenderedContent = false
-        renderValidationGeneration &+= 1
+    private func applyRuntimeProfile(_ profile: BrowserProfile) {
+        webView.customUserAgent = RiskReductionPolicy.effectiveUserAgent(for: profile)
+        webView.configuration.defaultWebpagePreferences.preferredContentMode =
+            RiskReductionPolicy.preferredContentMode(for: profile)
+        webView.isInspectable = !RiskReductionPolicy.isEnabled
     }
 
-    private func refreshState() {
-        canGoBack = webView.canGoBack
-        canGoForward = webView.canGoForward
-        isLoading = webView.isLoading
-        title = webView.title ?? ""
-        currentURL = webView.url
+    private func observeWebView() {
+        observations = [
+            webView.observe(\.title, options: [.initial, .new]) { [weak self] webView, _ in
+                Task { @MainActor in
+                    self?.title = webView.title ?? ""
+                }
+            },
+            webView.observe(\.url, options: [.initial, .new]) { [weak self] webView, _ in
+                Task { @MainActor in
+                    self?.currentURL = webView.url
+                }
+            },
+            webView.observe(\.canGoBack, options: [.initial, .new]) { [weak self] webView, _ in
+                Task { @MainActor in
+                    self?.canGoBack = webView.canGoBack
+                }
+            },
+            webView.observe(\.canGoForward, options: [.initial, .new]) { [weak self] webView, _ in
+                Task { @MainActor in
+                    self?.canGoForward = webView.canGoForward
+                }
+            },
+            webView.observe(\.estimatedProgress, options: [.initial, .new]) { [weak self] webView, _ in
+                Task { @MainActor in
+                    self?.estimatedProgress = webView.estimatedProgress
+                }
+            },
+            webView.observe(\.isLoading, options: [.initial, .new]) { [weak self] webView, _ in
+                Task { @MainActor in
+                    self?.isLoading = webView.isLoading
+                }
+            }
+        ]
     }
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         errorMessage = nil
-        beginNavigation()
-        refreshState()
+        hasRenderedContent = false
     }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
-        errorMessage = nil
-        refreshState()
+        // Once WebKit commits bytes to the main frame, remove our loading cover.
+        // X can continue hydrating normally without DOM polling or forced reloads.
+        hasRenderedContent = true
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         errorMessage = nil
-        refreshState()
-        let generation = renderValidationGeneration
-        validateRenderedContent(attempt: 0, generation: generation)
+        hasRenderedContent = true
+
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["XGIZOU_REAL_X_SMOKE"] == "1" {
+            webView.accessibilityIdentifier = "x-browser-real-x-loaded"
+        } else if ProcessInfo.processInfo.environment["XGIZOU_TEST_HOME_URL"] != nil {
+            webView.accessibilityIdentifier = "x-browser-webview-loaded"
+        }
+        #endif
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
@@ -192,89 +231,22 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         errorMessage = nil
-        beginNavigation()
+        hasRenderedContent = false
+
         if webView.url == nil {
             loadHome()
         } else {
             webView.reload()
         }
-        refreshState()
-    }
-
-    private func validateRenderedContent(attempt: Int, generation: Int) {
-        guard generation == renderValidationGeneration else { return }
-        guard let url = webView.url,
-              let host = url.host?.lowercased(),
-              BrowserHostPolicy.isXHost(host) || BrowserRuntimeConfiguration.isUITestHomeURL(url) else {
-            hasRenderedContent = true
-            return
-        }
-
-        let expectedURL = url.absoluteString
-        let script = """
-        (() => {
-          const body = document.body;
-          const textLength = (body?.innerText || '').trim().length;
-          const interactiveCount = body?.querySelectorAll(
-            'a,button,input,textarea,[role="button"],[data-testid]'
-          ).length || 0;
-          const htmlLength = document.documentElement?.outerHTML?.length || 0;
-          return { textLength, interactiveCount, htmlLength, href: location.href };
-        })();
-        """
-
-        webView.evaluateJavaScript(script) { [weak self] result, _ in
-            Task { @MainActor [weak self] in
-                guard let self,
-                      generation == self.renderValidationGeneration,
-                      self.webView.url?.absoluteString == expectedURL else {
-                    return
-                }
-
-                let values = result as? [String: Any]
-                let textLength = (values?["textLength"] as? NSNumber)?.intValue ?? 0
-                let interactiveCount = (values?["interactiveCount"] as? NSNumber)?.intValue ?? 0
-                let htmlLength = (values?["htmlLength"] as? NSNumber)?.intValue ?? 0
-
-                let rendered = htmlLength > 100 && (textLength > 10 || interactiveCount > 0)
-                if rendered {
-                    self.hasRenderedContent = true
-                    self.errorMessage = nil
-
-                    #if DEBUG
-                    if ProcessInfo.processInfo.environment["XGIZOU_REAL_X_SMOKE"] == "1" {
-                        self.webView.accessibilityIdentifier = "x-browser-real-x-loaded"
-                    } else if ProcessInfo.processInfo.environment["XGIZOU_TEST_HOME_URL"] != nil {
-                        self.webView.accessibilityIdentifier = "x-browser-webview-loaded"
-                    }
-                    #endif
-                    return
-                }
-
-                // X is a large client-side app. Do not reload it just because
-                // hydration is still in progress; doing so can repeatedly abort
-                // the very render we are waiting for.
-                if attempt < 20 {
-                    try? await Task.sleep(for: .milliseconds(750))
-                    self.validateRenderedContent(attempt: attempt + 1, generation: generation)
-                    return
-                }
-
-                self.hasRenderedContent = false
-                self.errorMessage = "Xのページは読み込まれましたが、内容を描画できませんでした。再試行してください。"
-            }
-        }
     }
 
     private func handleNavigationError(_ error: Error) {
-        renderValidationGeneration &+= 1
-        refreshState()
-
         if BrowserNavigationErrorClassifier.shouldIgnore(error) {
             errorMessage = nil
             return
         }
 
+        hasRenderedContent = false
         errorMessage = "Xを読み込めませんでした。通信状態を確認して再試行してください。\n" + error.localizedDescription
     }
 
@@ -299,12 +271,8 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
         decidePolicyFor navigationAction: WKNavigationAction,
         decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
     ) {
-        guard let url = navigationAction.request.url else {
-            decisionHandler(.cancel)
-            return
-        }
-
-        guard let scheme = url.scheme?.lowercased() else {
+        guard let url = navigationAction.request.url,
+              let scheme = url.scheme?.lowercased() else {
             decisionHandler(.cancel)
             return
         }
@@ -316,19 +284,16 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
         }
         #endif
 
-        if ["http", "https"].contains(scheme) {
+        if ["http", "https", "about", "data", "blob"].contains(scheme) {
             let isTopLevel = navigationAction.targetFrame == nil || navigationAction.targetFrame?.isMainFrame == true
-            if isTopLevel && RiskReductionPolicy.shouldOpenTopLevelExternally(url) {
+            if ["http", "https"].contains(scheme),
+               isTopLevel,
+               RiskReductionPolicy.shouldOpenTopLevelExternally(url) {
                 UIApplication.shared.open(url)
                 decisionHandler(.cancel)
                 return
             }
 
-            decisionHandler(.allow)
-            return
-        }
-
-        if scheme == "about" {
             decisionHandler(.allow)
             return
         }
