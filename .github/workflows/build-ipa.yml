@@ -131,10 +131,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Validate and start private remote browser
+      - name: Validate remote browser compose
+        run: docker compose config --quiet
+
+      - name: Pull remote browser images with retry
         run: |
-          docker compose config --quiet
-          docker compose up -d
+          set -euo pipefail
+          for attempt in $(seq 1 6); do
+            if COMPOSE_PARALLEL_LIMIT=1 docker compose pull; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 6 ]; then
+              echo "Remote browser image pull failed after 6 attempts" >&2
+              exit 1
+            fi
+            sleep $((attempt * 10))
+          done
+
+      - name: Start private remote browser
+        run: docker compose up -d --pull never
 
       - name: Check remote control page, browser process and environment identity
         run: |
@@ -158,7 +173,7 @@ jobs:
 
       - name: Verify separate browsers, storage and identities
         run: |
-          XGIZOU_HTTP_PORT=3002 docker compose -p xgizou-profile-two up -d
+          XGIZOU_HTTP_PORT=3002 docker compose -p xgizou-profile-two up -d --pull never
           for attempt in $(seq 1 60); do
             if curl --fail --silent http://127.0.0.1:3002/ -o /tmp/remote-second.html &&
                XGIZOU_HTTP_PORT=3002 docker compose -p xgizou-profile-two exec -T chromium sh -c 'pgrep -x chromium || pgrep -x chrome || pgrep -x chromium-browse' >/dev/null; then
