@@ -44,9 +44,7 @@ enum RiskReductionPolicy {
     static func effectiveUserAgent(for profile: BrowserProfile) -> String? {
         guard profile.effectiveExecutionMode == .onDevice else { return nil }
         return BrowserCompatibilityPolicy.effectiveUserAgent(
-            manualEnabled: profile.effectiveFingerprintOptions.enabled,
-            configuredUserAgent: profile.effectiveUserAgent,
-            safariFallbackUserAgent: UserAgentPreset.safariIOS.userAgent
+            configuredUserAgent: profile.effectiveUserAgent
         )
     }
 
