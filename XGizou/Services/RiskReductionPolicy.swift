@@ -42,9 +42,12 @@ enum RiskReductionPolicy {
     }
 
     static func effectiveUserAgent(for profile: BrowserProfile) -> String? {
-        guard profile.effectiveFingerprintOptions.enabled else { return nil }
-        let ua = profile.effectiveUserAgent.trimmingCharacters(in: .whitespacesAndNewlines)
-        return ua.isEmpty ? nil : ua
+        guard profile.effectiveExecutionMode == .onDevice else { return nil }
+        return BrowserCompatibilityPolicy.effectiveUserAgent(
+            manualEnabled: profile.effectiveFingerprintOptions.enabled,
+            configuredUserAgent: profile.effectiveUserAgent,
+            safariFallbackUserAgent: UserAgentPreset.safariIOS.userAgent
+        )
     }
 
     static func preferredContentMode(for profile: BrowserProfile) -> WKWebpagePreferences.ContentMode {
