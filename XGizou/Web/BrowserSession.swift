@@ -260,7 +260,9 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
             if RiskReductionPolicy.shouldOpenTopLevelExternally(requestURL) {
                 UIApplication.shared.open(requestURL)
             } else {
-                load(requestURL)
+                errorMessage = nil
+                hasRenderedContent = false
+                webView.load(navigationAction.request)
             }
         }
         return nil
