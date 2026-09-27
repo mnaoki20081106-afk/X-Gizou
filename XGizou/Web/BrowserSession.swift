@@ -18,7 +18,7 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
 
     private var currentProfile: BrowserProfile
     private var policyObserver: NSObjectProtocol?
-    private var blankRenderRecoveryCount = 0
+    private var renderValidationGeneration = 0
 
     init(profile: BrowserProfile) {
         profileID = profile.id
@@ -48,9 +48,13 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
         webView.allowsBackForwardNavigationGestures = true
         webView.allowsLinkPreview = true
         webView.accessibilityIdentifier = "x-browser-webview"
-        webView.isOpaque = false
+
+        // Keep WKWebView opaque. A transparent WebKit backing layer can flash or
+        // remain black while a large SPA is creating its first composited frame.
+        webView.isOpaque = true
         webView.backgroundColor = .systemBackground
         webView.scrollView.backgroundColor = .systemBackground
+        webView.underPageBackgroundColor = .systemBackground
 
         apply(profile: profile)
         refreshState()
@@ -64,7 +68,7 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
                 guard let self else { return }
                 self.apply(profile: self.currentProfile)
                 if self.webView.url != nil {
-                    self.webView.reload()
+                    self.reload()
                 }
             }
         }
@@ -91,7 +95,7 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
 
         webView.isInspectable = !RiskReductionPolicy.isEnabled
         if changed && webView.url != nil {
-            webView.reload()
+            reload()
         }
     }
 
@@ -112,8 +116,7 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
             return
         }
 
-        hasRenderedContent = false
-        blankRenderRecoveryCount = 0
+        beginNavigation()
 
         var request = URLRequest(url: url)
         request.cachePolicy = .useProtocolCachePolicy
@@ -123,6 +126,7 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
 
     func goBack() {
         if webView.canGoBack {
+            beginNavigation()
             webView.goBack()
             refreshState()
         }
@@ -130,6 +134,7 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
 
     func goForward() {
         if webView.canGoForward {
+            beginNavigation()
             webView.goForward()
             refreshState()
         }
@@ -137,14 +142,18 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
 
     func reload() {
         errorMessage = nil
-        hasRenderedContent = false
-        blankRenderRecoveryCount = 0
+        beginNavigation()
         if webView.url == nil {
             loadHome()
         } else {
             webView.reload()
         }
         refreshState()
+    }
+
+    private func beginNavigation() {
+        hasRenderedContent = false
+        renderValidationGeneration &+= 1
     }
 
     private func refreshState() {
@@ -157,6 +166,7 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         errorMessage = nil
+        beginNavigation()
         refreshState()
     }
 
@@ -168,7 +178,8 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         errorMessage = nil
         refreshState()
-        validateRenderedContent(attempt: 0)
+        let generation = renderValidationGeneration
+        validateRenderedContent(attempt: 0, generation: generation)
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
@@ -181,7 +192,7 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         errorMessage = nil
-        hasRenderedContent = false
+        beginNavigation()
         if webView.url == nil {
             loadHome()
         } else {
@@ -190,13 +201,16 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
         refreshState()
     }
 
-    private func validateRenderedContent(attempt: Int) {
-        guard let host = webView.url?.host?.lowercased(),
-              BrowserHostPolicy.isXHost(host) || BrowserRuntimeConfiguration.isUITestHomeURL(webView.url!) else {
+    private func validateRenderedContent(attempt: Int, generation: Int) {
+        guard generation == renderValidationGeneration else { return }
+        guard let url = webView.url,
+              let host = url.host?.lowercased(),
+              BrowserHostPolicy.isXHost(host) || BrowserRuntimeConfiguration.isUITestHomeURL(url) else {
             hasRenderedContent = true
             return
         }
 
+        let expectedURL = url.absoluteString
         let script = """
         (() => {
           const body = document.body;
@@ -211,7 +225,11 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
 
         webView.evaluateJavaScript(script) { [weak self] result, _ in
             Task { @MainActor [weak self] in
-                guard let self else { return }
+                guard let self,
+                      generation == self.renderValidationGeneration,
+                      self.webView.url?.absoluteString == expectedURL else {
+                    return
+                }
 
                 let values = result as? [String: Any]
                 let textLength = (values?["textLength"] as? NSNumber)?.intValue ?? 0
@@ -222,7 +240,6 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
                 if rendered {
                     self.hasRenderedContent = true
                     self.errorMessage = nil
-                    self.blankRenderRecoveryCount = 0
 
                     #if DEBUG
                     if ProcessInfo.processInfo.environment["XGIZOU_REAL_X_SMOKE"] == "1" {
@@ -234,15 +251,12 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
                     return
                 }
 
-                if attempt < 7 {
+                // X is a large client-side app. Do not reload it just because
+                // hydration is still in progress; doing so can repeatedly abort
+                // the very render we are waiting for.
+                if attempt < 20 {
                     try? await Task.sleep(for: .milliseconds(750))
-                    self.validateRenderedContent(attempt: attempt + 1)
-                    return
-                }
-
-                if self.blankRenderRecoveryCount == 0 {
-                    self.blankRenderRecoveryCount = 1
-                    self.webView.reload()
+                    self.validateRenderedContent(attempt: attempt + 1, generation: generation)
                     return
                 }
 
@@ -253,6 +267,7 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
     }
 
     private func handleNavigationError(_ error: Error) {
+        renderValidationGeneration &+= 1
         refreshState()
 
         if BrowserNavigationErrorClassifier.shouldIgnore(error) {
