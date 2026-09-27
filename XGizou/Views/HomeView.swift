@@ -75,7 +75,7 @@ private struct BrowserScreen: View {
             ZStack {
                 BrowserWebView(webView: session.webView)
 
-                if !session.hasRenderedContent && session.errorMessage == nil {
+                if session.isLoading && !session.hasRenderedContent && session.errorMessage == nil {
                     VStack(spacing: 12) {
                         ProgressView()
                             .controlSize(.large)
@@ -83,6 +83,8 @@ private struct BrowserScreen: View {
                             .font(.headline)
                             .foregroundStyle(.secondary)
                     }
+                    .padding(18)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
 
                 if let errorMessage = session.errorMessage {
