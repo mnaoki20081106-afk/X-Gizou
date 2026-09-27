@@ -1,15 +1,10 @@
 import Foundation
 
 enum BrowserCompatibilityPolicy {
-    static func effectiveUserAgent(
-        manualEnabled: Bool,
-        configuredUserAgent: String,
-        safariFallbackUserAgent: String
-    ) -> String {
+    /// Returning nil preserves WKWebView's native User-Agent. This is the
+    /// safest default because WebKit and its UA stay version-aligned.
+    static func effectiveUserAgent(configuredUserAgent: String) -> String? {
         let configured = configuredUserAgent.trimmingCharacters(in: .whitespacesAndNewlines)
-        if manualEnabled && !configured.isEmpty {
-            return configured
-        }
-        return safariFallbackUserAgent
+        return configured.isEmpty ? nil : configured
     }
 }
