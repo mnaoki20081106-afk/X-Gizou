@@ -75,6 +75,16 @@ private struct BrowserScreen: View {
             ZStack {
                 BrowserWebView(webView: session.webView)
 
+                if !session.hasRenderedContent && session.errorMessage == nil {
+                    VStack(spacing: 12) {
+                        ProgressView()
+                            .controlSize(.large)
+                        Text("Xを読み込んでいます")
+                            .font(.headline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
                 if let errorMessage = session.errorMessage {
                     VStack(spacing: 14) {
                         Image(systemName: "wifi.exclamationmark")
