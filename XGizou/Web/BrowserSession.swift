@@ -18,6 +18,7 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
 
     private var currentProfile: BrowserProfile
     private var policyObserver: NSObjectProtocol?
+    private var blankRenderRecoveryCount = 0
 
     init(profile: BrowserProfile) {
         profileID = profile.id
@@ -112,6 +113,7 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
         }
 
         hasRenderedContent = false
+        blankRenderRecoveryCount = 0
 
         var request = URLRequest(url: url)
         request.cachePolicy = .useProtocolCachePolicy
@@ -136,6 +138,7 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
     func reload() {
         errorMessage = nil
         hasRenderedContent = false
+        blankRenderRecoveryCount = 0
         if webView.url == nil {
             loadHome()
         } else {
@@ -211,14 +214,15 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
                 guard let self else { return }
 
                 let values = result as? [String: Any]
-                let textLength = values?["textLength"] as? Int ?? 0
-                let interactiveCount = values?["interactiveCount"] as? Int ?? 0
-                let htmlLength = values?["htmlLength"] as? Int ?? 0
+                let textLength = (values?["textLength"] as? NSNumber)?.intValue ?? 0
+                let interactiveCount = (values?["interactiveCount"] as? NSNumber)?.intValue ?? 0
+                let htmlLength = (values?["htmlLength"] as? NSNumber)?.intValue ?? 0
 
                 let rendered = htmlLength > 100 && (textLength > 10 || interactiveCount > 0)
                 if rendered {
                     self.hasRenderedContent = true
                     self.errorMessage = nil
+                    self.blankRenderRecoveryCount = 0
 
                     #if DEBUG
                     if ProcessInfo.processInfo.environment["XGIZOU_REAL_X_SMOKE"] == "1" {
@@ -236,10 +240,9 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
                     return
                 }
 
-                if attempt == 7 {
+                if self.blankRenderRecoveryCount == 0 {
+                    self.blankRenderRecoveryCount = 1
                     self.webView.reload()
-                    try? await Task.sleep(for: .seconds(2))
-                    self.validateRenderedContent(attempt: 8)
                     return
                 }
 
