@@ -14,6 +14,7 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
     @Published private(set) var title: String = ""
     @Published private(set) var currentURL: URL?
     @Published private(set) var errorMessage: String?
+    @Published private(set) var hasRenderedContent = false
 
     private var currentProfile: BrowserProfile
     private var policyObserver: NSObjectProtocol?
@@ -30,6 +31,8 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
         preferences.allowsContentJavaScript = true
         preferences.preferredContentMode = RiskReductionPolicy.preferredContentMode(for: profile)
         configuration.defaultWebpagePreferences = preferences
+        configuration.allowsInlineMediaPlayback = true
+        configuration.mediaTypesRequiringUserActionForPlayback = []
 
         if let script = FingerprintSpoofer.userScript(for: profile) {
             configuration.userContentController.addUserScript(script)
@@ -108,8 +111,10 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
             return
         }
 
+        hasRenderedContent = false
+
         var request = URLRequest(url: url)
-        request.cachePolicy = .reloadRevalidatingCacheData
+        request.cachePolicy = .useProtocolCachePolicy
         request.timeoutInterval = 30
         webView.load(request)
     }
@@ -130,6 +135,7 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
 
     func reload() {
         errorMessage = nil
+        hasRenderedContent = false
         if webView.url == nil {
             loadHome()
         } else {
@@ -158,12 +164,8 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         errorMessage = nil
-        #if DEBUG
-        if ProcessInfo.processInfo.environment["XGIZOU_TEST_HOME_URL"] != nil {
-            webView.accessibilityIdentifier = "x-browser-webview-loaded"
-        }
-        #endif
         refreshState()
+        validateRenderedContent(attempt: 0)
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
@@ -176,12 +178,75 @@ final class BrowserSession: NSObject, ObservableObject, WKNavigationDelegate, WK
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         errorMessage = nil
+        hasRenderedContent = false
         if webView.url == nil {
             loadHome()
         } else {
             webView.reload()
         }
         refreshState()
+    }
+
+    private func validateRenderedContent(attempt: Int) {
+        guard let host = webView.url?.host?.lowercased(),
+              BrowserHostPolicy.isXHost(host) || BrowserRuntimeConfiguration.isUITestHomeURL(webView.url!) else {
+            hasRenderedContent = true
+            return
+        }
+
+        let script = """
+        (() => {
+          const body = document.body;
+          const textLength = (body?.innerText || '').trim().length;
+          const interactiveCount = body?.querySelectorAll(
+            'a,button,input,textarea,[role="button"],[data-testid]'
+          ).length || 0;
+          const htmlLength = document.documentElement?.outerHTML?.length || 0;
+          return { textLength, interactiveCount, htmlLength, href: location.href };
+        })();
+        """
+
+        webView.evaluateJavaScript(script) { [weak self] result, _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+
+                let values = result as? [String: Any]
+                let textLength = values?["textLength"] as? Int ?? 0
+                let interactiveCount = values?["interactiveCount"] as? Int ?? 0
+                let htmlLength = values?["htmlLength"] as? Int ?? 0
+
+                let rendered = htmlLength > 100 && (textLength > 10 || interactiveCount > 0)
+                if rendered {
+                    self.hasRenderedContent = true
+                    self.errorMessage = nil
+
+                    #if DEBUG
+                    if ProcessInfo.processInfo.environment["XGIZOU_REAL_X_SMOKE"] == "1" {
+                        self.webView.accessibilityIdentifier = "x-browser-real-x-loaded"
+                    } else if ProcessInfo.processInfo.environment["XGIZOU_TEST_HOME_URL"] != nil {
+                        self.webView.accessibilityIdentifier = "x-browser-webview-loaded"
+                    }
+                    #endif
+                    return
+                }
+
+                if attempt < 7 {
+                    try? await Task.sleep(for: .milliseconds(750))
+                    self.validateRenderedContent(attempt: attempt + 1)
+                    return
+                }
+
+                if attempt == 7 {
+                    self.webView.reload()
+                    try? await Task.sleep(for: .seconds(2))
+                    self.validateRenderedContent(attempt: 8)
+                    return
+                }
+
+                self.hasRenderedContent = false
+                self.errorMessage = "Xのページは読み込まれましたが、内容を描画できませんでした。再試行してください。"
+            }
+        }
     }
 
     private func handleNavigationError(_ error: Error) {
