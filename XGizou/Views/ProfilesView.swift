@@ -7,6 +7,7 @@ struct ProfilesView: View {
 
     @State private var showingNewProfile = false
     @State private var editingProfile: BrowserProfile?
+    @State private var openSelectedProfileAfterNewProfileDismiss = false
 
     var body: some View {
         NavigationStack {
@@ -92,17 +93,28 @@ struct ProfilesView: View {
                     } label: {
                         Image(systemName: "plus")
                     }
+                    .accessibilityLabel("新規プロフィールを作成")
                 }
             }
             .refreshable {
                 await store.refreshIsolationState()
             }
         }
-        .sheet(isPresented: $showingNewProfile) {
+        .sheet(
+            isPresented: $showingNewProfile,
+            onDismiss: {
+                guard openSelectedProfileAfterNewProfileDismiss else { return }
+                openSelectedProfileAfterNewProfileDismiss = false
+                onOpenSelectedProfile()
+            }
+        ) {
             ProfileEditorView(profile: nil) { profile in
                 store.save(profile)
                 store.select(profile)
-                onOpenSelectedProfile()
+                // Changing the selected TabView while this sheet is still
+                // presented can race the sheet dismissal on a real device.
+                // Defer opening X until the modal has fully disappeared.
+                openSelectedProfileAfterNewProfileDismiss = true
             }
         }
         .sheet(item: $editingProfile) { profile in
